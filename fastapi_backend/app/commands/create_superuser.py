@@ -1,17 +1,15 @@
 import asyncio
 import os
 
-from fastapi_users.db import SQLAlchemyUserDatabase
 from fastapi_users import exceptions as fa_exceptions
+from fastapi_users.db import SQLAlchemyUserDatabase
 
 from app.database import async_session_maker
 from app.models import User
 from app.schemas import UserCreate, UserUpdate
 from app.users import UserManager
 
-
-EMAIL = "erp@bdf.kr"
-FULL_NAME = "관리자"
+EMAIL = "admin@example.com"
 
 
 async def main() -> None:
@@ -29,33 +27,28 @@ async def main() -> None:
             existing = None
 
         if existing is not None:
-            updated = existing
-            # set password (and any password policy validation)
             updated = await user_manager.update(
                 UserUpdate(password=password),
-                updated,
+                existing,
                 safe=False,
                 request=None,
             )
             updated.is_superuser = True  # type: ignore[attr-defined]
             updated.is_active = True  # type: ignore[attr-defined]
-            updated.full_name = FULL_NAME  # type: ignore[attr-defined]
             session.add(updated)
             await session.commit()
             return
 
         created = await user_manager.create(
-            UserCreate(email=EMAIL, password=password, full_name=FULL_NAME),
+            UserCreate(email=EMAIL, password=password),
             safe=True,
             request=None,
         )
         created.is_superuser = True  # type: ignore[attr-defined]
         created.is_active = True  # type: ignore[attr-defined]
-        created.full_name = FULL_NAME  # type: ignore[attr-defined]
         session.add(created)
         await session.commit()
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-

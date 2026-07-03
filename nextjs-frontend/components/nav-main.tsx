@@ -18,7 +18,6 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
-import { usePermissions } from "@/lib/permissions"
 
 function isSectionActive(pathname: string, item: { url: string; items?: { url: string }[] }): boolean {
   if (item.url !== "#" && (pathname === item.url || pathname.startsWith(item.url + "/"))) return true
@@ -31,44 +30,22 @@ export function NavMain({
   items: {
     title: string
     url: string
-    resource?: string
     icon?: LucideIcon
     isActive?: boolean
     hasChildren?: boolean
     items?: {
       title: string
       url: string
-      resource?: string
     }[]
   }[]
 }) {
   const pathname = usePathname()
-  const { can } = usePermissions()
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>BDF-ERP</SidebarGroupLabel>
+      <SidebarGroupLabel>HRD Work24</SidebarGroupLabel>
       <SidebarMenu>
-        {items
-          .map((item) => {
-            const visibleChildren = (item.items ?? []).filter(
-              (sub) => !sub.resource || can(sub.resource, "read"),
-            )
-
-            // If this section has children but none are visible, hide the parent section.
-            if (item.hasChildren && item.url === "#" && visibleChildren.length === 0) {
-              return null
-            }
-
-            // If parent has its own resource, enforce read permission on it too.
-            if (item.resource && !can(item.resource, "read")) {
-              return null
-            }
-
-            return { item, visibleChildren }
-          })
-          .filter((x): x is { item: (typeof items)[number]; visibleChildren: { title: string; url: string; resource?: string }[] } => x !== null)
-          .map(({ item, visibleChildren }) =>
-            item.hasChildren ? (
+        {items.map((item) =>
+          item.hasChildren ? (
             <Collapsible
               key={item.title}
               asChild
@@ -85,15 +62,15 @@ export function NavMain({
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <SidebarMenuSub>
-                    {visibleChildren.map((subItem) => (
-                        <SidebarMenuSubItem key={subItem.title}>
-                          <SidebarMenuSubButton asChild>
-                            <a href={subItem.url}>
-                              <span>{subItem.title}</span>
-                            </a>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
+                    {(item.items ?? []).map((subItem) => (
+                      <SidebarMenuSubItem key={subItem.title}>
+                        <SidebarMenuSubButton asChild>
+                          <a href={subItem.url}>
+                            <span>{subItem.title}</span>
+                          </a>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    ))}
                   </SidebarMenuSub>
                 </CollapsibleContent>
               </SidebarMenuItem>
@@ -108,7 +85,7 @@ export function NavMain({
               </SidebarMenuButton>
             </SidebarMenuItem>
           )
-          )}
+        )}
       </SidebarMenu>
     </SidebarGroup>
   )

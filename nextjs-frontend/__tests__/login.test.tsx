@@ -26,10 +26,6 @@ describe("login action", () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({ refresh_token: "refresh-token" }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        text: async () => JSON.stringify({ items: [] }),
       }) as unknown as typeof fetch;
   });
 
@@ -71,8 +67,8 @@ describe("login action", () => {
       })
     );
     expect(mockSet).toHaveBeenCalledWith(
-      "permSnapshot",
-      JSON.stringify({ items: [] }),
+      "refreshToken",
+      "refresh-token",
       expect.objectContaining({
         httpOnly: true,
         sameSite: "lax",

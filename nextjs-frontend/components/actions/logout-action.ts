@@ -18,6 +18,5 @@ export async function logout() {
 
   cookieStore.delete("accessToken");
   cookieStore.delete("refreshToken");
-  cookieStore.delete("permSnapshot");
   redirect(`/login`);
 }

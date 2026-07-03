@@ -25,7 +25,6 @@ const configureClient = () => {
           if (!originalRequest || originalRequest._retry) {
             cookieStore.delete("accessToken");
             cookieStore.delete("refreshToken");
-            cookieStore.delete("permSnapshot");
             redirect("/login");
           }
 
@@ -33,7 +32,6 @@ const configureClient = () => {
           if (!refreshToken || !baseURL) {
             cookieStore.delete("accessToken");
             cookieStore.delete("refreshToken");
-            cookieStore.delete("permSnapshot");
             redirect("/login");
           }
 
@@ -49,7 +47,6 @@ const configureClient = () => {
           if (!refreshRes.ok) {
             cookieStore.delete("accessToken");
             cookieStore.delete("refreshToken");
-            cookieStore.delete("permSnapshot");
             redirect("/login");
           }
 

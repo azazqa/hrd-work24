@@ -14,9 +14,6 @@ async function logoutAndRedirect(): Promise<never> {
   try {
     store.delete("refreshToken");
   } catch {}
-  try {
-    store.delete("permSnapshot");
-  } catch {}
   redirect("/login");
 }
 

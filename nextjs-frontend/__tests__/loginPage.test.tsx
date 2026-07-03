@@ -16,7 +16,7 @@ describe("Login Page", () => {
   it("renders the form with username and password input and submit button", () => {
     render(<Page />);
 
-    expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/로그인 아이디/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /sign in/i }),
@@ -28,7 +28,7 @@ describe("Login Page", () => {
 
     render(<Page />);
 
-    const usernameInput = screen.getByLabelText(/username/i);
+    const usernameInput = screen.getByLabelText(/로그인 아이디/i);
     const passwordInput = screen.getByLabelText(/password/i);
     const submitButton = screen.getByRole("button", { name: /sign in/i });
 
@@ -54,7 +54,7 @@ describe("Login Page", () => {
 
     render(<Page />);
 
-    const usernameInput = screen.getByLabelText(/username/i);
+    const usernameInput = screen.getByLabelText(/로그인 아이디/i);
     const passwordInput = screen.getByLabelText(/password/i);
     const submitButton = screen.getByRole("button", { name: /sign in/i });
 
@@ -74,7 +74,7 @@ describe("Login Page", () => {
 
     render(<Page />);
 
-    const usernameInput = screen.getByLabelText(/username/i);
+    const usernameInput = screen.getByLabelText(/로그인 아이디/i);
     const passwordInput = screen.getByLabelText(/password/i);
     const submitButton = screen.getByRole("button", { name: /sign in/i });
 

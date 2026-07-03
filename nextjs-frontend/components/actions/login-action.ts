@@ -64,27 +64,11 @@ export async function login(prevState: unknown, formData: FormData) {
       maxAge: 3 * 3600, // 3h; align with backend REFRESH_TOKEN_EXPIRE_SECONDS
       path: "/",
     });
-
-    const permRes = await fetch(`${baseURL}/permissions/me`, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${data.access_token}` },
-      cache: "no-store",
-    });
-    if (permRes.ok) {
-      const permBody = await permRes.text();
-      cookieStore.set("permSnapshot", permBody, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 3 * 3600,
-        path: "/",
-      });
-    }
   } catch (err) {
     console.error("Login error:", err);
     return {
       server_error: "An unexpected error occurred. Please try again later.",
     };
   }
-  redirect("/dashboard");
+  redirect("/");
 }
