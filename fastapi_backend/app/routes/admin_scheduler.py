@@ -23,7 +23,7 @@ QUEUE_STATUS_PENDING = "PENDING"
 QUEUE_STATUS_PROCESSING = "PROCESSING"
 QUEUE_STATUS_CANCELLED = "CANCELLED"
 
-REGISTERED_JOB_KEYS = frozenset({"course_index_refresh"})
+REGISTERED_JOB_KEYS = frozenset({"course_index_refresh", "legacy_course_index"})
 
 
 class SchedulerJobRead(BaseModel):
@@ -64,6 +64,7 @@ class SchedulerJobQueueRead(BaseModel):
     job_key: str
     action: str
     status: str
+    payload: dict | list | None = None
     requested_by_user_id: UUID | None
     related_log_id: int | None
     error_message: str | None

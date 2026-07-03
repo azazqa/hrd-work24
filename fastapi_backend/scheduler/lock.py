@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 LOCK_IDS: dict[str, int] = {
     "course_index_refresh": 20260101,
+    "legacy_course_index": 20260102,
 }
 
 

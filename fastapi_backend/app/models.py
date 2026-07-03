@@ -85,6 +85,7 @@ class SchedulerJobQueue(Base):
     job_key = Column(String(100), nullable=False, index=True)
     action = Column(String(20), nullable=False)
     status = Column(String(20), nullable=False, default="PENDING", server_default="PENDING")
+    payload = Column(JSONB, nullable=True)
     requested_by_user_id = Column(
         UUID(as_uuid=True), ForeignKey("user.id"), nullable=True, index=True
     )
@@ -96,3 +97,20 @@ class SchedulerJobQueue(Base):
     __table_args__ = (
         Index("ix_scheduler_job_queue_status_created", "status", "created_at"),
     )
+
+
+class Work24ApiLog(Base):
+    """Work24 Open API 호출 이력 (headers only)."""
+
+    __tablename__ = "work24_api_log"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    requested_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
+    )
+    method = Column(String(10), nullable=False)
+    url = Column(Text, nullable=False)
+    request_headers = Column(JSONB, nullable=True)
+    response_status = Column(Integer, nullable=True)
+    response_headers = Column(JSONB, nullable=True)
+    context = Column(JSONB, nullable=True)

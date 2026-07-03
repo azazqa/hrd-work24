@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     ELASTICSEARCH_URL: str = "http://elasticsearch:9200"
     ES_COURSE_INDEX: str = "trng_courses"
 
+    # Work24 Open API
+    WORK24_API_KEY: str
+    WORK24_URL: str
+    WORK24_API_DELAY_SECONDS: int = 10
+    WORK24_API_PAGE_SIZE: int = 100
+
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )

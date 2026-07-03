@@ -1,69 +1,107 @@
-const DISPLAY_TIMEZONE = "Asia/Seoul";
+import dayjs, { DISPLAY_TIMEZONE, parseApiDayjs } from "@/lib/dayjs";
 
-/**
- * API에서 오는 datetime 문자열을 파싱합니다.
- * - 끝에 Z / ±hh:mm 오프셋이 없으면 UTC로 간주하고 'Z'를 붙입니다.
- * - `YYYY-MM-DD HH:mm:ss` 형태(공백 구분)는 `T`로 바꿔 ISO로 맞춥니다.
- */
-export function parseApiDateTime(iso: string | null | undefined): Date | null {
-  if (iso == null || iso === "") return null;
-  if (typeof iso === "number" && Number.isFinite(iso)) {
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? null : d;
+export function formatYmdInSeoul(d: Date): string {
+  return dayjs(d).tz(DISPLAY_TIMEZONE).format("YYYY-MM-DD");
+}
+
+export function formatYmInSeoul(d: Date): string {
+  return dayjs(d).tz(DISPLAY_TIMEZONE).format("YYYY-MM");
+}
+
+export function formatYmLabelInSeoul(ym: string): string {
+  const d = parseYmInSeoul(ym);
+  if (!d) return "월 선택";
+  return dayjs(d).tz(DISPLAY_TIMEZONE).format("YYYY년 M월");
+}
+
+export function getWeekDaysContainingYmd(ymd: string): string[] {
+  const d = dayjs.tz(ymd, "YYYY-MM-DD", DISPLAY_TIMEZONE);
+  if (!d.isValid()) return [];
+  const weekStart = d.subtract(d.day(), "day");
+  return Array.from({ length: 7 }, (_, i) =>
+    weekStart.add(i, "day").format("YYYY-MM-DD"),
+  );
+}
+
+/** react-day-picker `fixedWeeks` + ko locale(weekStartsOn: 0) 그리드 범위 */
+export function getSettlementStatsCalendarGridRange(month: Date): {
+  range_start: string;
+  range_end: string;
+} {
+  const first = dayjs(month).tz(DISPLAY_TIMEZONE).startOf("month");
+  const last = first.endOf("month");
+  const gridStart = first.subtract(first.day(), "day");
+  let gridEnd = last.add(6 - last.day(), "day");
+  const totalDays = gridEnd.diff(gridStart, "day") + 1;
+  if (totalDays < 42) {
+    gridEnd = gridStart.add(41, "day");
   }
-  if (typeof iso !== "string") return null;
+  return {
+    range_start: gridStart.format("YYYY-MM-DD"),
+    range_end: gridEnd.format("YYYY-MM-DD"),
+  };
+}
 
-  let trimmed = iso.trim();
-  if (!trimmed) return null;
+export function parseYmInSeoul(ym: string | null | undefined): Date | null {
+  if (!ym) return null;
+  const t = String(ym).trim();
+  if (!t) return null;
+  const d = dayjs.tz(t, "YYYY-MM", DISPLAY_TIMEZONE);
+  return d.isValid() ? d.toDate() : null;
+}
 
-  // "YYYY-MM-DD HH:mm:ss..." → ISO 8601 (일부 환경에서 공백만으로는 Invalid Date)
-  if (/^\d{4}-\d{2}-\d{2}\s+\d/.test(trimmed)) {
-    trimmed = trimmed.replace(/^(\d{4}-\d{2}-\d{2})\s+/, "$1T");
-  }
-
-  // 끝이 Z 또는 ±오프셋 (소수 초 뒤 오프셋 포함: ...+09:00)
-  const hasOffsetOrZ = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(trimmed);
-
-  const candidate = hasOffsetOrZ ? trimmed : trimmed + "Z";
-  let d = new Date(candidate);
-  if (!Number.isNaN(d.getTime())) return d;
-
-  d = new Date(trimmed);
-  return Number.isNaN(d.getTime()) ? null : d;
+export function parseYmdInSeoul(ymd: string | null | undefined): Date | null {
+  if (!ymd) return null;
+  const t = String(ymd).trim();
+  if (!t) return null;
+  const d = dayjs.tz(t, "YYYY-MM-DD", DISPLAY_TIMEZONE);
+  return d.isValid() ? d.toDate() : null;
 }
 
 export function formatDateInSeoul(iso: string | null | undefined): string {
-  const d = parseApiDateTime(iso);
+  const d = parseApiDayjs(iso);
   if (!d) return "-";
-  return d.toLocaleDateString("ko-KR", {
-    timeZone: DISPLAY_TIMEZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
+  return d.tz(DISPLAY_TIMEZONE).format("YYYY-MM-DD");
 }
 
 export function formatDateTimeInSeoul(iso: string | null | undefined): string {
-  const d = parseApiDateTime(iso);
+  const d = parseApiDayjs(iso);
   if (!d) return "-";
-  // NOTE:
-  // - 서버(Node) 환경에서 ICU 데이터가 제한적이면 ko-KR이 폴백되어 "PM" 같은 문자열이 나올 수 있다.
-  // - hydration mismatch를 막기 위해 AM/PM(오전/오후) 문자열이 나오지 않는 24시간 숫자 포맷으로 고정한다.
-  return d.toLocaleString("ko-KR", {
-    timeZone: DISPLAY_TIMEZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
+  // 24시간 고정: hydration mismatch 방지
+  return d.tz(DISPLAY_TIMEZONE).format("YYYY-MM-DD HH:mm:ss");
 }
 
 /** null/undefined일 때 "" 반환 (라벨 등에서 사용) */
 export function formatDateInSeoulOrEmpty(iso: string | null | undefined): string {
   const s = formatDateInSeoul(iso);
   return s === "-" ? "" : s;
+}
+
+/** 훈련시작일 검색 기본값: 오늘 기준 이전 달 1일 ~ 말일 (Asia/Seoul) */
+export function getDefaultTraStartDateRange(): { start: string; end: string } {
+  const prevMonth = dayjs().tz(DISPLAY_TIMEZONE).subtract(1, "month");
+  return {
+    start: prevMonth.startOf("month").format("YYYY-MM-DD"),
+    end: prevMonth.endOf("month").format("YYYY-MM-DD"),
+  };
+}
+
+const TRA_START_YEAR_MIN = 2020;
+
+/** 과정 조회 훈련시작일 캘린더: 2020년 1월 ~ 내년 12월 (Asia/Seoul 기준) */
+export function getTraStartCalendarBounds(): {
+  startMonth: Date;
+  endMonth: Date;
+  minDate: Date;
+  maxDate: Date;
+} {
+  const now = dayjs().tz(DISPLAY_TIMEZONE);
+  const nextYear = now.year() + 1;
+  return {
+    startMonth: dayjs.tz(`${TRA_START_YEAR_MIN}-01-01`, DISPLAY_TIMEZONE).toDate(),
+    endMonth: dayjs.tz(`${nextYear}-12-01`, DISPLAY_TIMEZONE).toDate(),
+    minDate: dayjs.tz(`${TRA_START_YEAR_MIN}-01-01`, DISPLAY_TIMEZONE).toDate(),
+    maxDate: dayjs.tz(`${nextYear}-12-31`, DISPLAY_TIMEZONE).toDate(),
+  };
 }
 

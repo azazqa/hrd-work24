@@ -9,13 +9,24 @@ from sqlalchemy.orm import Session
 from app.models import SchedulerJobQueue
 from scheduler.db import build_scheduler_engine
 from scheduler.jobs.course_index_refresh import refresh_course_index
+from scheduler.jobs.legacy_course_index import run_legacy_course_index
 
 logger = logging.getLogger(__name__)
 
-KNOWN_JOB_KEYS = frozenset({"course_index_refresh"})
+KNOWN_JOB_KEYS = frozenset({"course_index_refresh", "legacy_course_index"})
+
+_PROCESSING_JOB_KEYS = (
+    select(SchedulerJobQueue.job_key)
+    .where(
+        SchedulerJobQueue.status == "PROCESSING",
+        SchedulerJobQueue.is_delete == False,  # noqa: E712
+    )
+    .distinct()
+    .scalar_subquery()
+)
 
 
-def _run_job(job_key: str, *, engine) -> tuple[str, str | None]:
+def _run_job(job_key: str, *, engine, payload: dict | None = None) -> tuple[str, str | None]:
     """
     Returns (outcome, error_message).
 
@@ -23,6 +34,14 @@ def _run_job(job_key: str, *, engine) -> tuple[str, str | None]:
     """
     if job_key == "course_index_refresh":
         result = refresh_course_index(engine=engine)
+        if result is None:
+            return "lock_skipped", None
+        if result.status == "SUCCESS":
+            return "succeeded", None
+        return "failed", result.error_message or "job failed"
+    if job_key == "legacy_course_index":
+        pl = dict(payload or {})
+        result = run_legacy_course_index(engine=engine, payload=pl)
         if result is None:
             return "lock_skipped", None
         if result.status == "SUCCESS":
@@ -44,6 +63,7 @@ def process_pending_queue(*, engine=None) -> None:
             .where(
                 SchedulerJobQueue.status == "PENDING",
                 SchedulerJobQueue.is_delete == False,  # noqa: E712
+                SchedulerJobQueue.job_key.not_in(_PROCESSING_JOB_KEYS),
             )
             .order_by(SchedulerJobQueue.id.asc())
             .limit(1)
@@ -90,7 +110,10 @@ def process_pending_queue(*, engine=None) -> None:
             logger.info("[QUEUE] skip cancelled before run id=%s", qid)
             return
 
-    outcome, err = _run_job(job_key, engine=engine)
+        row = session.get(SchedulerJobQueue, qid)
+        payload = row.payload if row else None
+
+    outcome, err = _run_job(job_key, engine=engine, payload=payload)
 
     with Session(engine) as session:
         if (

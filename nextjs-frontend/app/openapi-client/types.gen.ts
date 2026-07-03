@@ -59,6 +59,104 @@ export type BodyAuthVerifyVerify = {
 };
 
 /**
+ * CourseIndexResult
+ */
+export type CourseIndexResult = {
+  /**
+   * Fetched
+   */
+  fetched: number;
+  /**
+   * Indexed
+   */
+  indexed: number;
+  /**
+   * Total Count
+   */
+  total_count: number;
+};
+
+/**
+ * CourseListItem
+ */
+export type CourseListItem = {
+  /**
+   * Trainst Cst Id
+   */
+  trainst_cst_id?: string | null;
+  /**
+   * Trpr Id
+   */
+  trpr_id?: string | null;
+  /**
+   * Trpr Degr
+   */
+  trpr_degr?: string | null;
+  /**
+   * Course Name
+   */
+  course_name?: string | null;
+  /**
+   * Inst Name
+   */
+  inst_name?: string | null;
+  /**
+   * Tra Start Date
+   */
+  tra_start_date?: string | null;
+  /**
+   * Tra End Date
+   */
+  tra_end_date?: string | null;
+  /**
+   * Address
+   */
+  address?: string | null;
+  /**
+   * Tel No
+   */
+  tel_no?: string | null;
+  /**
+   * Title Link
+   */
+  title_link?: string | null;
+  /**
+   * Reg Course Man
+   */
+  reg_course_man?: string | null;
+  /**
+   * Yard Man
+   */
+  yard_man?: string | null;
+  /**
+   * Real Man
+   */
+  real_man?: string | null;
+};
+
+/**
+ * CourseListResponse
+ */
+export type CourseListResponse = {
+  /**
+   * Items
+   */
+  items: Array<CourseListItem>;
+  /**
+   * Total Count
+   */
+  total_count: number;
+  /**
+   * Page Num
+   */
+  page_num: number;
+  /**
+   * Page Size
+   */
+  page_size: number;
+};
+
+/**
  * CourseSearchHit
  */
 export type CourseSearchHit = {
@@ -115,6 +213,46 @@ export type HttpValidationError = {
 };
 
 /**
+ * LegacyIndexRequest
+ */
+export type LegacyIndexRequest = {
+  /**
+   * Start Month
+   */
+  start_month: string;
+  /**
+   * End Month
+   */
+  end_month: string;
+};
+
+/**
+ * LegacyIndexResponse
+ */
+export type LegacyIndexResponse = {
+  /**
+   * Queue Ids
+   */
+  queue_ids: Array<number>;
+  /**
+   * Start Month
+   */
+  start_month: string;
+  /**
+   * End Month
+   */
+  end_month: string;
+  /**
+   * Month Count
+   */
+  month_count: number;
+  /**
+   * Message
+   */
+  message: string;
+};
+
+/**
  * Page[SchedulerJobLogRead]
  */
 export type PageSchedulerJobLogRead = {
@@ -148,6 +286,32 @@ export type PageSchedulerJobQueueRead = {
    * Items
    */
   items: Array<SchedulerJobQueueRead>;
+  /**
+   * Total
+   */
+  total?: number | null;
+  /**
+   * Page
+   */
+  page: number | null;
+  /**
+   * Size
+   */
+  size: number | null;
+  /**
+   * Pages
+   */
+  pages?: number | null;
+};
+
+/**
+ * Page[Work24ApiLogRead]
+ */
+export type PageWork24ApiLogRead = {
+  /**
+   * Items
+   */
+  items: Array<Work24ApiLogRead>;
   /**
    * Total
    */
@@ -263,6 +427,15 @@ export type SchedulerJobQueueRead = {
    * Status
    */
   status: string;
+  /**
+   * Payload
+   */
+  payload?:
+    | {
+        [key: string]: unknown;
+      }
+    | Array<unknown>
+    | null;
   /**
    * Requested By User Id
    */
@@ -421,6 +594,59 @@ export type ValidationError = {
    * Error Type
    */
   type: string;
+};
+
+/**
+ * Work24ApiLogRead
+ */
+export type Work24ApiLogRead = {
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Requested At
+   */
+  requested_at: string;
+  /**
+   * Method
+   */
+  method: string;
+  /**
+   * Url
+   */
+  url: string;
+  /**
+   * Request Headers
+   */
+  request_headers:
+    | {
+        [key: string]: unknown;
+      }
+    | Array<unknown>
+    | null;
+  /**
+   * Response Status
+   */
+  response_status: number | null;
+  /**
+   * Response Headers
+   */
+  response_headers:
+    | {
+        [key: string]: unknown;
+      }
+    | Array<unknown>
+    | null;
+  /**
+   * Context
+   */
+  context:
+    | {
+        [key: string]: unknown;
+      }
+    | Array<unknown>
+    | null;
 };
 
 /**
@@ -1151,6 +1377,61 @@ export type ClearStuckRunningLogAndEnqueueResponses = {
 export type ClearStuckRunningLogAndEnqueueResponse =
   ClearStuckRunningLogAndEnqueueResponses[keyof ClearStuckRunningLogAndEnqueueResponses];
 
+export type ListCoursesData = {
+  body?: never;
+  path?: never;
+  query: {
+    /**
+     * Srch Tra St Dt
+     * 훈련시작일 From (YYYYMMDD 또는 YYYY-MM-DD)
+     */
+    srch_tra_st_dt: string;
+    /**
+     * Srch Tra End Dt
+     * 훈련시작일 To (YYYYMMDD 또는 YYYY-MM-DD)
+     */
+    srch_tra_end_dt: string;
+    /**
+     * Srch Tra Organ Nm
+     * 훈련기관명
+     */
+    srch_tra_organ_nm?: string | null;
+    /**
+     * Srch Tra Process Nm
+     * 훈련과정명
+     */
+    srch_tra_process_nm?: string | null;
+    /**
+     * Page Num
+     */
+    page_num?: number;
+    /**
+     * Page Size
+     */
+    page_size?: number;
+  };
+  url: "/courses";
+};
+
+export type ListCoursesErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type ListCoursesError = ListCoursesErrors[keyof ListCoursesErrors];
+
+export type ListCoursesResponses = {
+  /**
+   * Successful Response
+   */
+  200: CourseListResponse;
+};
+
+export type ListCoursesResponse =
+  ListCoursesResponses[keyof ListCoursesResponses];
+
 export type SearchCoursesData = {
   body?: never;
   path?: never;
@@ -1186,6 +1467,101 @@ export type SearchCoursesResponses = {
 
 export type SearchCoursesResponse =
   SearchCoursesResponses[keyof SearchCoursesResponses];
+
+export type IndexCoursesFromWork24Data = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/courses/index";
+};
+
+export type IndexCoursesFromWork24Responses = {
+  /**
+   * Successful Response
+   */
+  200: CourseIndexResult;
+};
+
+export type IndexCoursesFromWork24Response =
+  IndexCoursesFromWork24Responses[keyof IndexCoursesFromWork24Responses];
+
+export type EnqueueLegacyCourseIndexData = {
+  body: LegacyIndexRequest;
+  path?: never;
+  query?: never;
+  url: "/courses/legacy-index";
+};
+
+export type EnqueueLegacyCourseIndexErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type EnqueueLegacyCourseIndexError =
+  EnqueueLegacyCourseIndexErrors[keyof EnqueueLegacyCourseIndexErrors];
+
+export type EnqueueLegacyCourseIndexResponses = {
+  /**
+   * Successful Response
+   */
+  200: LegacyIndexResponse;
+};
+
+export type EnqueueLegacyCourseIndexResponse =
+  EnqueueLegacyCourseIndexResponses[keyof EnqueueLegacyCourseIndexResponses];
+
+export type ListWork24ApiLogsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Page
+     * Page number
+     */
+    page?: number;
+    /**
+     * Size
+     * Page size
+     */
+    size?: number;
+    /**
+     * Source
+     */
+    source?: string | null;
+    /**
+     * Response Status
+     */
+    response_status?: number | null;
+    /**
+     * Month
+     * YYYY-MM
+     */
+    month?: string | null;
+  };
+  url: "/admin/work24-api-logs";
+};
+
+export type ListWork24ApiLogsErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type ListWork24ApiLogsError =
+  ListWork24ApiLogsErrors[keyof ListWork24ApiLogsErrors];
+
+export type ListWork24ApiLogsResponses = {
+  /**
+   * Successful Response
+   */
+  200: PageWork24ApiLogRead;
+};
+
+export type ListWork24ApiLogsResponse =
+  ListWork24ApiLogsResponses[keyof ListWork24ApiLogsResponses];
 
 export type ClientOptions = {
   baseURL: `${string}://openapi.json` | (string & {});

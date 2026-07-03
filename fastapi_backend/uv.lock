@@ -123,6 +123,7 @@ dependencies = [
     { name = "openpyxl" },
     { name = "psycopg2-binary" },
     { name = "pydantic-settings" },
+    { name = "requests" },
 ]
 
 [package.dev-dependencies]
@@ -154,6 +155,7 @@ requires-dist = [
     { name = "openpyxl", specifier = ">=3.1.2,<4" },
     { name = "psycopg2-binary", specifier = ">=2.9.12" },
     { name = "pydantic-settings", specifier = ">=2.5.2,<3" },
+    { name = "requests", specifier = ">=2.32,<3" },
 ]
 
 [package.metadata.requires-dev]

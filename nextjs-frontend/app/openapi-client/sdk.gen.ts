@@ -71,9 +71,20 @@ import type {
   ClearStuckRunningLogAndEnqueueData,
   ClearStuckRunningLogAndEnqueueResponses,
   ClearStuckRunningLogAndEnqueueErrors,
+  ListCoursesData,
+  ListCoursesResponses,
+  ListCoursesErrors,
   SearchCoursesData,
   SearchCoursesResponses,
   SearchCoursesErrors,
+  IndexCoursesFromWork24Data,
+  IndexCoursesFromWork24Responses,
+  EnqueueLegacyCourseIndexData,
+  EnqueueLegacyCourseIndexResponses,
+  EnqueueLegacyCourseIndexErrors,
+  ListWork24ApiLogsData,
+  ListWork24ApiLogsResponses,
+  ListWork24ApiLogsErrors,
 } from "./types.gen";
 import { client } from "./client.gen";
 
@@ -605,6 +616,29 @@ export const clearStuckRunningLogAndEnqueue = <
 };
 
 /**
+ * List Courses
+ */
+export const listCourses = <ThrowOnError extends boolean = false>(
+  options: Options<ListCoursesData, ThrowOnError>,
+) => {
+  return (options.client ?? client).get<
+    ListCoursesResponses,
+    ListCoursesErrors,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/courses",
+    ...options,
+  });
+};
+
+/**
  * Search Courses
  */
 export const searchCourses = <ThrowOnError extends boolean = false>(
@@ -623,6 +657,79 @@ export const searchCourses = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/courses/search",
+    ...options,
+  });
+};
+
+/**
+ * Index Courses From Work24
+ */
+export const indexCoursesFromWork24 = <ThrowOnError extends boolean = false>(
+  options?: Options<IndexCoursesFromWork24Data, ThrowOnError>,
+) => {
+  return (options?.client ?? client).post<
+    IndexCoursesFromWork24Responses,
+    unknown,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/courses/index",
+    ...options,
+  });
+};
+
+/**
+ * Enqueue Legacy Course Index
+ */
+export const enqueueLegacyCourseIndex = <ThrowOnError extends boolean = false>(
+  options: Options<EnqueueLegacyCourseIndexData, ThrowOnError>,
+) => {
+  return (options.client ?? client).post<
+    EnqueueLegacyCourseIndexResponses,
+    EnqueueLegacyCourseIndexErrors,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/courses/legacy-index",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+};
+
+/**
+ * List Work24 Api Logs
+ */
+export const listWork24ApiLogs = <ThrowOnError extends boolean = false>(
+  options?: Options<ListWork24ApiLogsData, ThrowOnError>,
+) => {
+  return (options?.client ?? client).get<
+    ListWork24ApiLogsResponses,
+    ListWork24ApiLogsErrors,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/admin/work24-api-logs",
     ...options,
   });
 };
