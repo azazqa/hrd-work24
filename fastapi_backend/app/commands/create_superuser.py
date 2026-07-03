@@ -9,7 +9,7 @@ from app.models import User
 from app.schemas import UserCreate, UserUpdate
 from app.users import UserManager
 
-EMAIL = "admin@example.com"
+EMAIL = "work24@hrdcenter.co.kr"
 
 
 async def main() -> None:

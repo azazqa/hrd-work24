@@ -44,6 +44,36 @@ import type {
   UsersPatchUserData,
   UsersPatchUserResponses,
   UsersPatchUserErrors,
+  ListSchedulerJobsData,
+  ListSchedulerJobsResponses,
+  ListSchedulerJobsErrors,
+  CreateSchedulerJobData,
+  CreateSchedulerJobResponses,
+  CreateSchedulerJobErrors,
+  DeleteSchedulerJobData,
+  DeleteSchedulerJobResponses,
+  DeleteSchedulerJobErrors,
+  UpdateSchedulerJobData,
+  UpdateSchedulerJobResponses,
+  UpdateSchedulerJobErrors,
+  EnqueueRunNowData,
+  EnqueueRunNowResponses,
+  EnqueueRunNowErrors,
+  ListJobQueueData,
+  ListJobQueueResponses,
+  ListJobQueueErrors,
+  CancelQueueItemData,
+  CancelQueueItemResponses,
+  CancelQueueItemErrors,
+  ListJobLogsData,
+  ListJobLogsResponses,
+  ListJobLogsErrors,
+  ClearStuckRunningLogAndEnqueueData,
+  ClearStuckRunningLogAndEnqueueResponses,
+  ClearStuckRunningLogAndEnqueueErrors,
+  SearchCoursesData,
+  SearchCoursesResponses,
+  SearchCoursesErrors,
 } from "./types.gen";
 import { client } from "./client.gen";
 
@@ -355,5 +385,244 @@ export const usersPatchUser = <ThrowOnError extends boolean = false>(
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+};
+
+/**
+ * List Scheduler Jobs
+ */
+export const listSchedulerJobs = <ThrowOnError extends boolean = false>(
+  options?: Options<ListSchedulerJobsData, ThrowOnError>,
+) => {
+  return (options?.client ?? client).get<
+    ListSchedulerJobsResponses,
+    ListSchedulerJobsErrors,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/admin/scheduler/jobs",
+    ...options,
+  });
+};
+
+/**
+ * Create Scheduler Job
+ */
+export const createSchedulerJob = <ThrowOnError extends boolean = false>(
+  options: Options<CreateSchedulerJobData, ThrowOnError>,
+) => {
+  return (options.client ?? client).post<
+    CreateSchedulerJobResponses,
+    CreateSchedulerJobErrors,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/admin/scheduler/jobs",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+};
+
+/**
+ * Delete Scheduler Job
+ */
+export const deleteSchedulerJob = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteSchedulerJobData, ThrowOnError>,
+) => {
+  return (options.client ?? client).delete<
+    DeleteSchedulerJobResponses,
+    DeleteSchedulerJobErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/admin/scheduler/jobs/{job_key}",
+    ...options,
+  });
+};
+
+/**
+ * Update Scheduler Job
+ */
+export const updateSchedulerJob = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateSchedulerJobData, ThrowOnError>,
+) => {
+  return (options.client ?? client).patch<
+    UpdateSchedulerJobResponses,
+    UpdateSchedulerJobErrors,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/admin/scheduler/jobs/{job_key}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+};
+
+/**
+ * Enqueue Run Now
+ */
+export const enqueueRunNow = <ThrowOnError extends boolean = false>(
+  options: Options<EnqueueRunNowData, ThrowOnError>,
+) => {
+  return (options.client ?? client).post<
+    EnqueueRunNowResponses,
+    EnqueueRunNowErrors,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/admin/scheduler/jobs/{job_key}/enqueue-run",
+    ...options,
+  });
+};
+
+/**
+ * List Job Queue
+ */
+export const listJobQueue = <ThrowOnError extends boolean = false>(
+  options?: Options<ListJobQueueData, ThrowOnError>,
+) => {
+  return (options?.client ?? client).get<
+    ListJobQueueResponses,
+    ListJobQueueErrors,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/admin/scheduler/queue",
+    ...options,
+  });
+};
+
+/**
+ * Cancel Queue Item
+ */
+export const cancelQueueItem = <ThrowOnError extends boolean = false>(
+  options: Options<CancelQueueItemData, ThrowOnError>,
+) => {
+  return (options.client ?? client).post<
+    CancelQueueItemResponses,
+    CancelQueueItemErrors,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/admin/scheduler/queue/{queue_id}/cancel",
+    ...options,
+  });
+};
+
+/**
+ * List Job Logs
+ */
+export const listJobLogs = <ThrowOnError extends boolean = false>(
+  options?: Options<ListJobLogsData, ThrowOnError>,
+) => {
+  return (options?.client ?? client).get<
+    ListJobLogsResponses,
+    ListJobLogsErrors,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/admin/scheduler/job-logs",
+    ...options,
+  });
+};
+
+/**
+ * Clear Stuck Running Log And Enqueue
+ */
+export const clearStuckRunningLogAndEnqueue = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ClearStuckRunningLogAndEnqueueData, ThrowOnError>,
+) => {
+  return (options.client ?? client).post<
+    ClearStuckRunningLogAndEnqueueResponses,
+    ClearStuckRunningLogAndEnqueueErrors,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/admin/scheduler/job-logs/{log_id}/clear-stuck-and-enqueue",
+    ...options,
+  });
+};
+
+/**
+ * Search Courses
+ */
+export const searchCourses = <ThrowOnError extends boolean = false>(
+  options: Options<SearchCoursesData, ThrowOnError>,
+) => {
+  return (options.client ?? client).get<
+    SearchCoursesResponses,
+    SearchCoursesErrors,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/courses/search",
+    ...options,
   });
 };

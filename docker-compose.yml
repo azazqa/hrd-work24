@@ -6,6 +6,7 @@ services:
       - TZ=Asia/Seoul
       - OPENAPI_OUTPUT_FILE=./shared-data/openapi.json
       - DATABASE_URL=postgresql+asyncpg://postgres:439e19e7328d37abb598d1603dbe9eca8abef29433544c1e@db:5432/app
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
     ports:
       - "8000:8000"
     volumes:
@@ -13,7 +14,55 @@ services:
       # - fastapi-venv:/app/.venv
       - ./local-shared-data:/app/shared-data
     depends_on:
-      - db
+      db:
+        condition: service_started
+      elasticsearch:
+        condition: service_healthy
+
+  scheduler:
+    build:
+      context: fastapi_backend
+    command: ["/app/.venv/bin/python", "-m", "scheduler.runner"]
+    environment:
+      - TZ=Asia/Seoul
+      - DATABASE_URL=postgresql+asyncpg://postgres:439e19e7328d37abb598d1603dbe9eca8abef29433544c1e@db:5432/app
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    volumes:
+      - ./local-shared-data:/app/shared-data
+    depends_on:
+      db:
+        condition: service_started
+      elasticsearch:
+        condition: service_healthy
+
+  elasticsearch:
+    build:
+      context: ./elasticsearch
+    environment:
+      - TZ=Asia/Seoul
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    expose:
+      - "9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fs http://localhost:9200/_cluster/health?wait_for_status=yellow || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
   db:
     image: postgres:18.3-alpine3.23
     environment:
@@ -40,3 +89,4 @@ services:
 
 volumes:
   postgres_data:
+  es_data:

@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     # CORS
     CORS_ORIGINS: Set[str]
 
+    # Elasticsearch
+    ELASTICSEARCH_URL: str = "http://elasticsearch:9200"
+    ES_COURSE_INDEX: str = "trng_courses"
+
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )

@@ -59,6 +59,38 @@ export type BodyAuthVerifyVerify = {
 };
 
 /**
+ * CourseSearchHit
+ */
+export type CourseSearchHit = {
+  /**
+   * Trpr Id
+   */
+  trpr_id?: string | null;
+  /**
+   * Trng Crse Nm
+   */
+  trng_crse_nm?: string | null;
+  /**
+   * Inst Nm
+   */
+  inst_nm?: string | null;
+  /**
+   * Score
+   */
+  score: number;
+  [key: string]:
+    | unknown
+    | string
+    | null
+    | string
+    | null
+    | string
+    | null
+    | number
+    | undefined;
+};
+
+/**
  * ErrorModel
  */
 export type ErrorModel = {
@@ -80,6 +112,245 @@ export type HttpValidationError = {
    * Detail
    */
   detail?: Array<ValidationError>;
+};
+
+/**
+ * Page[SchedulerJobLogRead]
+ */
+export type PageSchedulerJobLogRead = {
+  /**
+   * Items
+   */
+  items: Array<SchedulerJobLogRead>;
+  /**
+   * Total
+   */
+  total?: number | null;
+  /**
+   * Page
+   */
+  page: number | null;
+  /**
+   * Size
+   */
+  size: number | null;
+  /**
+   * Pages
+   */
+  pages?: number | null;
+};
+
+/**
+ * Page[SchedulerJobQueueRead]
+ */
+export type PageSchedulerJobQueueRead = {
+  /**
+   * Items
+   */
+  items: Array<SchedulerJobQueueRead>;
+  /**
+   * Total
+   */
+  total?: number | null;
+  /**
+   * Page
+   */
+  page: number | null;
+  /**
+   * Size
+   */
+  size: number | null;
+  /**
+   * Pages
+   */
+  pages?: number | null;
+};
+
+/**
+ * SchedulerJobCreate
+ */
+export type SchedulerJobCreate = {
+  /**
+   * Job Key
+   */
+  job_key: string;
+  /**
+   * Title
+   */
+  title: string;
+  /**
+   * Enabled
+   */
+  enabled?: boolean;
+  /**
+   * Cron Hour
+   */
+  cron_hour?: number;
+  /**
+   * Cron Minute
+   */
+  cron_minute?: number;
+  /**
+   * Timezone
+   */
+  timezone?: string;
+  /**
+   * Description
+   */
+  description?: string | null;
+};
+
+/**
+ * SchedulerJobLogRead
+ */
+export type SchedulerJobLogRead = {
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Job Id
+   */
+  job_id: string;
+  /**
+   * Started At
+   */
+  started_at: string;
+  /**
+   * Finished At
+   */
+  finished_at: string | null;
+  /**
+   * Status
+   */
+  status: string;
+  /**
+   * Elapsed Sec
+   */
+  elapsed_sec: number | null;
+  /**
+   * Error Message
+   */
+  error_message: string | null;
+  /**
+   * Detail
+   */
+  detail:
+    | {
+        [key: string]: unknown;
+      }
+    | Array<unknown>
+    | null;
+};
+
+/**
+ * SchedulerJobQueueRead
+ */
+export type SchedulerJobQueueRead = {
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Job Key
+   */
+  job_key: string;
+  /**
+   * Action
+   */
+  action: string;
+  /**
+   * Status
+   */
+  status: string;
+  /**
+   * Requested By User Id
+   */
+  requested_by_user_id: string | null;
+  /**
+   * Related Log Id
+   */
+  related_log_id: number | null;
+  /**
+   * Error Message
+   */
+  error_message: string | null;
+  /**
+   * Created At
+   */
+  created_at: string;
+  /**
+   * Started At
+   */
+  started_at: string | null;
+  /**
+   * Finished At
+   */
+  finished_at: string | null;
+};
+
+/**
+ * SchedulerJobRead
+ */
+export type SchedulerJobRead = {
+  /**
+   * Job Key
+   */
+  job_key: string;
+  /**
+   * Title
+   */
+  title: string;
+  /**
+   * Enabled
+   */
+  enabled: boolean;
+  /**
+   * Cron Hour
+   */
+  cron_hour: number;
+  /**
+   * Cron Minute
+   */
+  cron_minute: number;
+  /**
+   * Timezone
+   */
+  timezone: string;
+  /**
+   * Description
+   */
+  description: string | null;
+};
+
+/**
+ * SchedulerJobUpdate
+ */
+export type SchedulerJobUpdate = {
+  /**
+   * Title
+   */
+  title?: string | null;
+  /**
+   * Enabled
+   */
+  enabled?: boolean | null;
+  /**
+   * Cron Hour
+   */
+  cron_hour?: number | null;
+  /**
+   * Cron Minute
+   */
+  cron_minute?: number | null;
+  /**
+   * Timezone
+   */
+  timezone?: string | null;
+  /**
+   * Description
+   */
+  description?: string | null;
 };
 
 /**
@@ -559,6 +830,362 @@ export type UsersPatchUserResponses = {
 
 export type UsersPatchUserResponse =
   UsersPatchUserResponses[keyof UsersPatchUserResponses];
+
+export type ListSchedulerJobsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Q
+     * job_key 또는 title 검색
+     */
+    q?: string | null;
+  };
+  url: "/admin/scheduler/jobs";
+};
+
+export type ListSchedulerJobsErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type ListSchedulerJobsError =
+  ListSchedulerJobsErrors[keyof ListSchedulerJobsErrors];
+
+export type ListSchedulerJobsResponses = {
+  /**
+   * Response Admin-Scheduler-List Scheduler Jobs
+   * Successful Response
+   */
+  200: Array<SchedulerJobRead>;
+};
+
+export type ListSchedulerJobsResponse =
+  ListSchedulerJobsResponses[keyof ListSchedulerJobsResponses];
+
+export type CreateSchedulerJobData = {
+  body: SchedulerJobCreate;
+  path?: never;
+  query?: never;
+  url: "/admin/scheduler/jobs";
+};
+
+export type CreateSchedulerJobErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type CreateSchedulerJobError =
+  CreateSchedulerJobErrors[keyof CreateSchedulerJobErrors];
+
+export type CreateSchedulerJobResponses = {
+  /**
+   * Successful Response
+   */
+  201: SchedulerJobRead;
+};
+
+export type CreateSchedulerJobResponse =
+  CreateSchedulerJobResponses[keyof CreateSchedulerJobResponses];
+
+export type DeleteSchedulerJobData = {
+  body?: never;
+  path: {
+    /**
+     * Job Key
+     */
+    job_key: string;
+  };
+  query?: never;
+  url: "/admin/scheduler/jobs/{job_key}";
+};
+
+export type DeleteSchedulerJobErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type DeleteSchedulerJobError =
+  DeleteSchedulerJobErrors[keyof DeleteSchedulerJobErrors];
+
+export type DeleteSchedulerJobResponses = {
+  /**
+   * Successful Response
+   */
+  204: void;
+};
+
+export type DeleteSchedulerJobResponse =
+  DeleteSchedulerJobResponses[keyof DeleteSchedulerJobResponses];
+
+export type UpdateSchedulerJobData = {
+  body: SchedulerJobUpdate;
+  path: {
+    /**
+     * Job Key
+     */
+    job_key: string;
+  };
+  query?: never;
+  url: "/admin/scheduler/jobs/{job_key}";
+};
+
+export type UpdateSchedulerJobErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type UpdateSchedulerJobError =
+  UpdateSchedulerJobErrors[keyof UpdateSchedulerJobErrors];
+
+export type UpdateSchedulerJobResponses = {
+  /**
+   * Successful Response
+   */
+  200: SchedulerJobRead;
+};
+
+export type UpdateSchedulerJobResponse =
+  UpdateSchedulerJobResponses[keyof UpdateSchedulerJobResponses];
+
+export type EnqueueRunNowData = {
+  body?: never;
+  path: {
+    /**
+     * Job Key
+     */
+    job_key: string;
+  };
+  query?: never;
+  url: "/admin/scheduler/jobs/{job_key}/enqueue-run";
+};
+
+export type EnqueueRunNowErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type EnqueueRunNowError = EnqueueRunNowErrors[keyof EnqueueRunNowErrors];
+
+export type EnqueueRunNowResponses = {
+  /**
+   * Successful Response
+   */
+  200: SchedulerJobQueueRead;
+};
+
+export type EnqueueRunNowResponse =
+  EnqueueRunNowResponses[keyof EnqueueRunNowResponses];
+
+export type ListJobQueueData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Page
+     * Page number
+     */
+    page?: number;
+    /**
+     * Size
+     * Page size
+     */
+    size?: number;
+    /**
+     * Status
+     */
+    status?: string | null;
+    /**
+     * Job Key
+     */
+    job_key?: string | null;
+    /**
+     * Q
+     * job_key 검색
+     */
+    q?: string | null;
+  };
+  url: "/admin/scheduler/queue";
+};
+
+export type ListJobQueueErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type ListJobQueueError = ListJobQueueErrors[keyof ListJobQueueErrors];
+
+export type ListJobQueueResponses = {
+  /**
+   * Successful Response
+   */
+  200: PageSchedulerJobQueueRead;
+};
+
+export type ListJobQueueResponse =
+  ListJobQueueResponses[keyof ListJobQueueResponses];
+
+export type CancelQueueItemData = {
+  body?: never;
+  path: {
+    /**
+     * Queue Id
+     */
+    queue_id: number;
+  };
+  query?: never;
+  url: "/admin/scheduler/queue/{queue_id}/cancel";
+};
+
+export type CancelQueueItemErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type CancelQueueItemError =
+  CancelQueueItemErrors[keyof CancelQueueItemErrors];
+
+export type CancelQueueItemResponses = {
+  /**
+   * Successful Response
+   */
+  200: SchedulerJobQueueRead;
+};
+
+export type CancelQueueItemResponse =
+  CancelQueueItemResponses[keyof CancelQueueItemResponses];
+
+export type ListJobLogsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Page
+     * Page number
+     */
+    page?: number;
+    /**
+     * Size
+     * Page size
+     */
+    size?: number;
+    /**
+     * Job Id
+     */
+    job_id?: string | null;
+    /**
+     * Status
+     */
+    status?: string | null;
+  };
+  url: "/admin/scheduler/job-logs";
+};
+
+export type ListJobLogsErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type ListJobLogsError = ListJobLogsErrors[keyof ListJobLogsErrors];
+
+export type ListJobLogsResponses = {
+  /**
+   * Successful Response
+   */
+  200: PageSchedulerJobLogRead;
+};
+
+export type ListJobLogsResponse =
+  ListJobLogsResponses[keyof ListJobLogsResponses];
+
+export type ClearStuckRunningLogAndEnqueueData = {
+  body?: never;
+  path: {
+    /**
+     * Log Id
+     */
+    log_id: number;
+  };
+  query?: {
+    /**
+     * Min Age Seconds
+     */
+    min_age_seconds?: number;
+  };
+  url: "/admin/scheduler/job-logs/{log_id}/clear-stuck-and-enqueue";
+};
+
+export type ClearStuckRunningLogAndEnqueueErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type ClearStuckRunningLogAndEnqueueError =
+  ClearStuckRunningLogAndEnqueueErrors[keyof ClearStuckRunningLogAndEnqueueErrors];
+
+export type ClearStuckRunningLogAndEnqueueResponses = {
+  /**
+   * Successful Response
+   */
+  200: SchedulerJobQueueRead;
+};
+
+export type ClearStuckRunningLogAndEnqueueResponse =
+  ClearStuckRunningLogAndEnqueueResponses[keyof ClearStuckRunningLogAndEnqueueResponses];
+
+export type SearchCoursesData = {
+  body?: never;
+  path?: never;
+  query: {
+    /**
+     * Keyword
+     */
+    keyword: string;
+    /**
+     * Size
+     */
+    size?: number;
+  };
+  url: "/courses/search";
+};
+
+export type SearchCoursesErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type SearchCoursesError = SearchCoursesErrors[keyof SearchCoursesErrors];
+
+export type SearchCoursesResponses = {
+  /**
+   * Response Courses-Search Courses
+   * Successful Response
+   */
+  200: Array<CourseSearchHit>;
+};
+
+export type SearchCoursesResponse =
+  SearchCoursesResponses[keyof SearchCoursesResponses];
 
 export type ClientOptions = {
   baseURL: `${string}://openapi.json` | (string & {});

@@ -20,7 +20,10 @@ export function getErrorMessage(error: ClientApiError): string {
 
   const detail = error.detail;
   if (typeof detail === "string") {
-    errorMessage = detail;
+    errorMessage =
+      detail === "LOGIN_BAD_CREDENTIALS"
+        ? "로그인 아이디 또는 비밀번호가 올바르지 않습니다."
+        : detail;
   } else if (Array.isArray(detail) && detail.length > 0) {
     const parts = detail
       .map((d) => (d && typeof d === "object" && "msg" in d ? String(d.msg) : ""))
@@ -30,6 +33,13 @@ export function getErrorMessage(error: ClientApiError): string {
     }
   } else if (typeof detail === "object" && detail !== null && "reason" in detail) {
     errorMessage = String((detail as { reason: string }).reason);
+  }
+
+  if (errorMessage === "An unknown error occurred") {
+    const maybeAxios = error as { message?: string };
+    if (maybeAxios.message) {
+      return `백엔드 API 연결 실패: ${maybeAxios.message}`;
+    }
   }
 
   return errorMessage;

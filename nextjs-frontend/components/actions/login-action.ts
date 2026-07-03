@@ -21,6 +21,14 @@ export async function login(prevState: unknown, formData: FormData) {
 
   const { username, password } = validatedFields.data;
 
+  const baseURL = process.env.API_BASE_URL;
+  if (!baseURL) {
+    return {
+      server_error:
+        "API_BASE_URL is not configured. Copy nextjs-frontend/.env.example to .env.local.",
+    };
+  }
+
   const input = {
     body: {
       username,
@@ -41,11 +49,6 @@ export async function login(prevState: unknown, formData: FormData) {
       maxAge: 3600, // 1h; align with backend ACCESS_TOKEN_EXPIRE_SECONDS
       path: "/",
     });
-
-    const baseURL = process.env.API_BASE_URL;
-    if (!baseURL) {
-      return { server_error: "API_BASE_URL is not configured." };
-    }
 
     const refreshRes = await fetch(`${baseURL}/auth/jwt/refresh-token`, {
       method: "POST",
