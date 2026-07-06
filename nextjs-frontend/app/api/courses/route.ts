@@ -24,6 +24,7 @@ export async function GET(request: Request) {
   const optionalKeys = [
     "srch_tra_organ_nm",
     "srch_tra_process_nm",
+    "has_reg_course_man",
     "page_num",
     "page_size",
   ] as const;

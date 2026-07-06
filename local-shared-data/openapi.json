@@ -1218,6 +1218,391 @@
         }
       }
     },
+    "/courses": {
+      "get": {
+        "tags": [
+          "courses"
+        ],
+        "summary": "List Courses",
+        "operationId": "list_courses",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "srch_tra_st_dt",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "\ud6c8\ub828\uc2dc\uc791\uc77c From (YYYYMMDD \ub610\ub294 YYYY-MM-DD)",
+              "title": "Srch Tra St Dt"
+            },
+            "description": "\ud6c8\ub828\uc2dc\uc791\uc77c From (YYYYMMDD \ub610\ub294 YYYY-MM-DD)"
+          },
+          {
+            "name": "srch_tra_end_dt",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "\ud6c8\ub828\uc2dc\uc791\uc77c To (YYYYMMDD \ub610\ub294 YYYY-MM-DD)",
+              "title": "Srch Tra End Dt"
+            },
+            "description": "\ud6c8\ub828\uc2dc\uc791\uc77c To (YYYYMMDD \ub610\ub294 YYYY-MM-DD)"
+          },
+          {
+            "name": "srch_tra_organ_nm",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "\ud6c8\ub828\uae30\uad00\uba85",
+              "title": "Srch Tra Organ Nm"
+            },
+            "description": "\ud6c8\ub828\uae30\uad00\uba85"
+          },
+          {
+            "name": "srch_tra_process_nm",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "\ud6c8\ub828\uacfc\uc815\uba85",
+              "title": "Srch Tra Process Nm"
+            },
+            "description": "\ud6c8\ub828\uacfc\uc815\uba85"
+          },
+          {
+            "name": "has_reg_course_man",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "\uc218\uac15\uc2e0\uccad \uc778\uc6d0 \uc788\uc74c (regCourseMan > 0)",
+              "default": false,
+              "title": "Has Reg Course Man"
+            },
+            "description": "\uc218\uac15\uc2e0\uccad \uc778\uc6d0 \uc788\uc74c (regCourseMan > 0)"
+          },
+          {
+            "name": "page_num",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Page Num"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/courses/owned-search": {
+      "get": {
+        "tags": [
+          "courses"
+        ],
+        "summary": "Search Owned Courses",
+        "operationId": "search_owned_courses",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "year",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 2100,
+              "minimum": 2023,
+              "description": "\ud6c8\ub828\uc2dc\uc791\uc77c \uae30\uc900 \uc870\ud68c \ub144\ub3c4",
+              "title": "Year"
+            },
+            "description": "\ud6c8\ub828\uc2dc\uc791\uc77c \uae30\uc900 \uc870\ud68c \ub144\ub3c4"
+          },
+          {
+            "name": "min_score",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": 0.0,
+              "description": "\uad00\ub828\ub3c4 \uc784\uacc4\uce58 (0\uc774\uba74 \ubbf8\uc801\uc6a9)",
+              "default": 0,
+              "title": "Min Score"
+            },
+            "description": "\uad00\ub828\ub3c4 \uc784\uacc4\uce58 (0\uc774\uba74 \ubbf8\uc801\uc6a9)"
+          },
+          {
+            "name": "has_reg_course_man",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "\uc218\uac15\uc2e0\uccad \uc778\uc6d0 \uc788\uc74c (regCourseMan > 0)",
+              "default": false,
+              "title": "Has Reg Course Man"
+            },
+            "description": "\uc218\uac15\uc2e0\uccad \uc778\uc6d0 \uc788\uc74c (regCourseMan > 0)"
+          },
+          {
+            "name": "page_num",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 1,
+              "title": "Page Num"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/courses/export": {
+      "get": {
+        "tags": [
+          "courses"
+        ],
+        "summary": "Export Courses",
+        "operationId": "export_courses",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "srch_tra_st_dt",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "\ud6c8\ub828\uc2dc\uc791\uc77c From (YYYYMMDD \ub610\ub294 YYYY-MM-DD)",
+              "title": "Srch Tra St Dt"
+            },
+            "description": "\ud6c8\ub828\uc2dc\uc791\uc77c From (YYYYMMDD \ub610\ub294 YYYY-MM-DD)"
+          },
+          {
+            "name": "srch_tra_end_dt",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "\ud6c8\ub828\uc2dc\uc791\uc77c To (YYYYMMDD \ub610\ub294 YYYY-MM-DD)",
+              "title": "Srch Tra End Dt"
+            },
+            "description": "\ud6c8\ub828\uc2dc\uc791\uc77c To (YYYYMMDD \ub610\ub294 YYYY-MM-DD)"
+          },
+          {
+            "name": "srch_tra_organ_nm",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "\ud6c8\ub828\uae30\uad00\uba85",
+              "title": "Srch Tra Organ Nm"
+            },
+            "description": "\ud6c8\ub828\uae30\uad00\uba85"
+          },
+          {
+            "name": "srch_tra_process_nm",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "\ud6c8\ub828\uacfc\uc815\uba85",
+              "title": "Srch Tra Process Nm"
+            },
+            "description": "\ud6c8\ub828\uacfc\uc815\uba85"
+          },
+          {
+            "name": "has_reg_course_man",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "\uc218\uac15\uc2e0\uccad \uc778\uc6d0 \uc788\uc74c (regCourseMan > 0)",
+              "default": false,
+              "title": "Has Reg Course Man"
+            },
+            "description": "\uc218\uac15\uc2e0\uccad \uc778\uc6d0 \uc788\uc74c (regCourseMan > 0)"
+          },
+          {
+            "name": "owned_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 2100,
+                  "minimum": 2023
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "\ubcf4\uc720 \uacfc\uc815 \uc870\ud68c \ub144\ub3c4",
+              "title": "Owned Year"
+            },
+            "description": "\ubcf4\uc720 \uacfc\uc815 \uc870\ud68c \ub144\ub3c4"
+          },
+          {
+            "name": "min_score",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": 0.0,
+              "description": "\uad00\ub828\ub3c4 \uc784\uacc4\uce58 (\ubcf4\uc720 \uacfc\uc815 \uc870\ud68c)",
+              "default": 0,
+              "title": "Min Score"
+            },
+            "description": "\uad00\ub828\ub3c4 \uc784\uacc4\uce58 (\ubcf4\uc720 \uacfc\uc815 \uc870\ud68c)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/courses/search": {
       "get": {
         "tags": [
@@ -1265,6 +1650,578 @@
                     "$ref": "#/components/schemas/CourseSearchHit"
                   },
                   "title": "Response Courses-Search Courses"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/courses/index": {
+      "post": {
+        "tags": [
+          "courses"
+        ],
+        "summary": "Index Courses From Work24",
+        "operationId": "index_courses_from_work24",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseIndexResult"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/courses/legacy-index": {
+      "post": {
+        "tags": [
+          "courses"
+        ],
+        "summary": "Enqueue Legacy Course Index",
+        "operationId": "enqueue_legacy_course_index",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LegacyIndexRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegacyIndexResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/owned-courses": {
+      "get": {
+        "tags": [
+          "owned-courses"
+        ],
+        "summary": "List Owned Courses",
+        "operationId": "list_owned_courses",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Page size",
+              "default": 50,
+              "title": "Size"
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "\uacfc\uc815\uba85 \uac80\uc0c9",
+              "title": "Q"
+            },
+            "description": "\uacfc\uc815\uba85 \uac80\uc0c9"
+          },
+          {
+            "name": "is_active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Active"
+            }
+          },
+          {
+            "name": "dev_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Dev Year"
+            }
+          },
+          {
+            "name": "division",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Division"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_OwnedCourseListItem_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "owned-courses"
+        ],
+        "summary": "Create Owned Course",
+        "operationId": "create_owned_course",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnedCourseCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnedCourseRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/owned-courses/import/template": {
+      "get": {
+        "tags": [
+          "owned-courses"
+        ],
+        "summary": "Download Import Template",
+        "operationId": "download_import_template",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/owned-courses/import": {
+      "post": {
+        "tags": [
+          "owned-courses"
+        ],
+        "summary": "Import Owned Courses",
+        "operationId": "import_owned_courses",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_owned-courses-import_owned_courses"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnedCourseImportResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/owned-courses/{course_id}": {
+      "get": {
+        "tags": [
+          "owned-courses"
+        ],
+        "summary": "Get Owned Course",
+        "operationId": "get_owned_course",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "course_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Course Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnedCourseRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "owned-courses"
+        ],
+        "summary": "Update Owned Course",
+        "operationId": "update_owned_course",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "course_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Course Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnedCourseUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnedCourseRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "owned-courses"
+        ],
+        "summary": "Delete Owned Course",
+        "operationId": "delete_owned_course",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "course_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Course Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/work24-api-logs": {
+      "get": {
+        "tags": [
+          "admin-work24-api-logs"
+        ],
+        "summary": "List Work24 Api Logs",
+        "operationId": "list_work24_api_logs",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Page size",
+              "default": 50,
+              "title": "Size"
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "name": "response_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Response Status"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "YYYY-MM",
+              "title": "Month"
+            },
+            "description": "YYYY-MM"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_Work24ApiLogRead_"
                 }
               }
             }
@@ -1362,6 +2319,226 @@
         ],
         "title": "Body_auth-verify:verify"
       },
+      "Body_owned-courses-import_owned_courses": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_owned-courses-import_owned_courses"
+      },
+      "CourseIndexResult": {
+        "properties": {
+          "fetched": {
+            "type": "integer",
+            "title": "Fetched"
+          },
+          "indexed": {
+            "type": "integer",
+            "title": "Indexed"
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fetched",
+          "indexed",
+          "total_count"
+        ],
+        "title": "CourseIndexResult"
+      },
+      "CourseListItem": {
+        "properties": {
+          "trainst_cst_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trainst Cst Id"
+          },
+          "trpr_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trpr Id"
+          },
+          "trpr_degr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trpr Degr"
+          },
+          "course_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Course Name"
+          },
+          "inst_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inst Name"
+          },
+          "tra_start_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tra Start Date"
+          },
+          "tra_end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tra End Date"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "tel_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tel No"
+          },
+          "title_link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Link"
+          },
+          "reg_course_man": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reg Course Man",
+            "description": "\uc218\uac15\uc2e0\uccad \uc778\uc6d0 (Work24 regCourseMan)"
+          },
+          "yard_man": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yard Man",
+            "description": "\uc815\uc6d0 (Work24 yardMan)"
+          },
+          "real_man": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Real Man",
+            "description": "\uc2e4\uc81c \ud6c8\ub828\ube44 (Work24 realMan)"
+          }
+        },
+        "type": "object",
+        "title": "CourseListItem"
+      },
+      "CourseListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CourseListItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count"
+          },
+          "page_num": {
+            "type": "integer",
+            "title": "Page Num"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total_count",
+          "page_num",
+          "page_size"
+        ],
+        "title": "CourseListResponse"
+      },
       "CourseSearchHit": {
         "properties": {
           "trpr_id": {
@@ -1444,6 +2621,735 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "LegacyIndexRequest": {
+        "properties": {
+          "start_month": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}$",
+            "title": "Start Month"
+          },
+          "end_month": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}$",
+            "title": "End Month"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_month",
+          "end_month"
+        ],
+        "title": "LegacyIndexRequest"
+      },
+      "LegacyIndexResponse": {
+        "properties": {
+          "queue_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Queue Ids"
+          },
+          "start_month": {
+            "type": "string",
+            "title": "Start Month"
+          },
+          "end_month": {
+            "type": "string",
+            "title": "End Month"
+          },
+          "month_count": {
+            "type": "integer",
+            "title": "Month Count"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "queue_ids",
+          "start_month",
+          "end_month",
+          "month_count",
+          "message"
+        ],
+        "title": "LegacyIndexResponse"
+      },
+      "OwnedCourseCreate": {
+        "properties": {
+          "dev_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dev Year"
+          },
+          "dev_round": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dev Round"
+          },
+          "review_round": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Round"
+          },
+          "division": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Division"
+          },
+          "ncs_dev_category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ncs Dev Category"
+          },
+          "course_name": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Course Name"
+          },
+          "session_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Count"
+          },
+          "eval_training_volume": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eval Training Volume"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "grade_initial": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grade Initial"
+          },
+          "grade_23": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grade 23"
+          },
+          "ncs_applied": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ncs Applied"
+          },
+          "ncs_approved": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ncs Approved"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "course_name"
+        ],
+        "title": "OwnedCourseCreate"
+      },
+      "OwnedCourseImportError": {
+        "properties": {
+          "row": {
+            "type": "integer",
+            "title": "Row"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "row",
+          "message"
+        ],
+        "title": "OwnedCourseImportError"
+      },
+      "OwnedCourseImportResult": {
+        "properties": {
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "updated": {
+            "type": "integer",
+            "title": "Updated"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/OwnedCourseImportError"
+            },
+            "type": "array",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created",
+          "updated",
+          "failed",
+          "errors"
+        ],
+        "title": "OwnedCourseImportResult"
+      },
+      "OwnedCourseListItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "dev_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dev Year"
+          },
+          "division": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Division"
+          },
+          "course_name": {
+            "type": "string",
+            "title": "Course Name"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "dev_year",
+          "division",
+          "course_name",
+          "is_active"
+        ],
+        "title": "OwnedCourseListItem"
+      },
+      "OwnedCourseRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "dev_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dev Year"
+          },
+          "dev_round": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dev Round"
+          },
+          "review_round": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Round"
+          },
+          "division": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Division"
+          },
+          "ncs_dev_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ncs Dev Category"
+          },
+          "course_name": {
+            "type": "string",
+            "title": "Course Name"
+          },
+          "session_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Count"
+          },
+          "eval_training_volume": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eval Training Volume"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "grade_initial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grade Initial"
+          },
+          "grade_23": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grade 23"
+          },
+          "ncs_applied": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ncs Applied"
+          },
+          "ncs_approved": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ncs Approved"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "dev_year",
+          "dev_round",
+          "review_round",
+          "division",
+          "ncs_dev_category",
+          "course_name",
+          "session_count",
+          "eval_training_volume",
+          "result",
+          "grade_initial",
+          "grade_23",
+          "ncs_applied",
+          "ncs_approved",
+          "is_active",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "OwnedCourseRead"
+      },
+      "OwnedCourseUpdate": {
+        "properties": {
+          "dev_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dev Year"
+          },
+          "dev_round": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dev Round"
+          },
+          "review_round": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Round"
+          },
+          "division": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Division"
+          },
+          "ncs_dev_category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ncs Dev Category"
+          },
+          "course_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Course Name"
+          },
+          "session_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Count"
+          },
+          "eval_training_volume": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eval Training Volume"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "grade_initial": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grade Initial"
+          },
+          "grade_23": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grade 23"
+          },
+          "ncs_applied": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ncs Applied"
+          },
+          "ncs_approved": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ncs Approved"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "title": "OwnedCourseUpdate"
+      },
+      "Page_OwnedCourseListItem_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OwnedCourseListItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "size"
+        ],
+        "title": "Page[OwnedCourseListItem]"
       },
       "Page_SchedulerJobLogRead_": {
         "properties": {
@@ -1576,6 +3482,72 @@
           "size"
         ],
         "title": "Page[SchedulerJobQueueRead]"
+      },
+      "Page_Work24ApiLogRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Work24ApiLogRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "size"
+        ],
+        "title": "Page[Work24ApiLogRead]"
       },
       "SchedulerJobCreate": {
         "properties": {
@@ -1735,6 +3707,21 @@
           "status": {
             "type": "string",
             "title": "Status"
+          },
+          "payload": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payload"
           },
           "requested_by_user_id": {
             "anyOf": [
@@ -2072,6 +4059,95 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "Work24ApiLogRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Requested At"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "request_headers": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Headers"
+          },
+          "response_status": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response Status"
+          },
+          "response_headers": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response Headers"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "requested_at",
+          "method",
+          "url",
+          "request_headers",
+          "response_status",
+          "response_headers",
+          "context"
+        ],
+        "title": "Work24ApiLogRead"
       },
       "login": {
         "properties": {

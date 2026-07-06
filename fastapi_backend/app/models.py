@@ -99,6 +99,30 @@ class SchedulerJobQueue(Base):
     )
 
 
+class OwnedCourse(Base):
+    """보유 과정 마스터."""
+
+    __tablename__ = "owned_courses"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    dev_year = Column(Integer, nullable=True, index=True)
+    dev_round = Column(Integer, nullable=True)
+    review_round = Column(String(50), nullable=True)
+    division = Column(String(100), nullable=True, index=True)
+    ncs_dev_category = Column(String(100), nullable=True)
+    course_name = Column(String(500), nullable=False, index=True)
+    session_count = Column(Integer, nullable=True)
+    eval_training_volume = Column(String(100), nullable=True)
+    result = Column(String(100), nullable=True)
+    grade_initial = Column(String(50), nullable=True)
+    grade_23 = Column(String(50), nullable=True)
+    ncs_applied = Column(String(100), nullable=True)
+    ncs_approved = Column(String(100), nullable=True)
+    is_active = Column(
+        Boolean, nullable=False, default=True, server_default="true", index=True
+    )
+
+
 class Work24ApiLog(Base):
     """Work24 Open API 호출 이력 (headers only)."""
 

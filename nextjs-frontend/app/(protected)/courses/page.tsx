@@ -1,4 +1,8 @@
-import { fetchCourses, type CourseListSearch } from "@/components/actions/courses-action";
+import {
+  fetchCourses,
+  fetchOwnedMatchedCourses,
+  type CourseListSearch,
+} from "@/components/actions/courses-action";
 import { PagePagination } from "@/components/page-pagination";
 import { getDefaultTraStartDateRange } from "@/lib/date-utils";
 import { redirect } from "next/navigation";
@@ -14,7 +18,14 @@ interface CoursesPageProps {
     srch_tra_end_dt?: string;
     srch_tra_organ_nm?: string;
     srch_tra_process_nm?: string;
+    owned_year?: string;
+    min_score?: string;
+    has_reg_course_man?: string;
   }>;
+}
+
+function parseHasRegCourseMan(value: string | undefined): boolean {
+  return value === "true" || value === "1";
 }
 
 function buildCourseSearchQuery(
@@ -25,6 +36,11 @@ function buildCourseSearchQuery(
     const t = v?.trim();
     if (t) parts.push(`${encodeURIComponent(k)}=${encodeURIComponent(t)}`);
   };
+  add("owned_year", p.owned_year);
+  add("min_score", p.min_score);
+  if (parseHasRegCourseMan(p.has_reg_course_man)) {
+    parts.push("has_reg_course_man=true");
+  }
   add("srch_tra_st_dt", p.srch_tra_st_dt);
   add("srch_tra_end_dt", p.srch_tra_end_dt);
   add("srch_tra_organ_nm", p.srch_tra_organ_nm);
@@ -41,17 +57,87 @@ function searchFromParams(
     srch_tra_end_dt: p.srch_tra_end_dt ?? defaults.end,
     srch_tra_organ_nm: p.srch_tra_organ_nm,
     srch_tra_process_nm: p.srch_tra_process_nm,
+    has_reg_course_man: parseHasRegCourseMan(p.has_reg_course_man),
   };
 }
 
 export default async function CoursesPage({ searchParams }: CoursesPageProps) {
   const params = await searchParams;
+  const ownedYearRaw = params.owned_year?.trim();
+  const ownedYear = ownedYearRaw ? Number(ownedYearRaw) : undefined;
+  const isOwnedSearch =
+    ownedYear != null && Number.isFinite(ownedYear) && ownedYear >= 2023;
+
+  const page = Number(params.page) || 1;
+  const size = Number(params.size) || 20;
+  const minScore = Number(params.min_score ?? "1") || 0;
+  const hasRegCourseMan = parseHasRegCourseMan(params.has_reg_course_man);
+
+  if (isOwnedSearch) {
+    const extraQuery = buildCourseSearchQuery(params);
+    const exportQuery = extraQuery;
+    const courses = await fetchOwnedMatchedCourses(
+      ownedYear!,
+      page,
+      size,
+      minScore,
+      hasRegCourseMan,
+    );
+    const totalPages =
+      "message" in courses ? 0 : Math.ceil(courses.total_count / size);
+
+    return (
+      <div>
+        <h2 className="mb-2 text-2xl font-semibold">과정 조회</h2>
+        <p className="mb-6 text-sm text-muted-foreground">
+          보유 과정 조회 ({ownedYear}년, 관련도 임계치 {minScore}
+          {hasRegCourseMan ? ", 수강신청 인원 있음" : ""}) — 활성 보유과정명과
+          매칭된 Work24 과정입니다.
+        </p>
+
+        <section className="rounded-lg bg-white p-6 shadow-lg dark:bg-gray-900">
+          <CourseSearchForm
+            size={size}
+            ownedSearchContext={{
+              owned_year: ownedYear!,
+              min_score: minScore,
+            }}
+            initial={{
+              srch_tra_st_dt: params.srch_tra_st_dt,
+              srch_tra_end_dt: params.srch_tra_end_dt,
+              srch_tra_organ_nm: params.srch_tra_organ_nm,
+              srch_tra_process_nm: params.srch_tra_process_nm,
+              has_reg_course_man: hasRegCourseMan,
+            }}
+          />
+        </section>
+
+        <section className="mt-8 rounded-lg bg-white p-6 shadow-lg dark:bg-gray-900">
+          {"message" in courses ? (
+            <p className="text-sm text-destructive">{courses.message}</p>
+          ) : (
+            <CoursesList items={courses.items ?? []} exportQuery={exportQuery} />
+          )}
+
+          <PagePagination
+            currentPage={page}
+            totalPages={Math.max(1, totalPages)}
+            pageSize={size}
+            totalItems={"message" in courses ? 0 : courses.total_count}
+            basePath="/courses"
+            extraQuery={extraQuery}
+          />
+        </section>
+      </div>
+    );
+  }
+
   const defaults = getDefaultTraStartDateRange();
 
   if (!params.srch_tra_st_dt || !params.srch_tra_end_dt) {
     const q = new URLSearchParams();
-    q.set("page", String(Number(params.page) || 1));
-    q.set("size", String(Number(params.size) || 20));
+    q.set("page", String(page));
+    q.set("size", String(size));
     q.set(
       "srch_tra_st_dt",
       (params.srch_tra_st_dt ?? defaults.start).trim() || defaults.start,
@@ -66,12 +152,14 @@ export default async function CoursesPage({ searchParams }: CoursesPageProps) {
     if (params.srch_tra_process_nm?.trim()) {
       q.set("srch_tra_process_nm", params.srch_tra_process_nm.trim());
     }
+    if (hasRegCourseMan) {
+      q.set("has_reg_course_man", "true");
+    }
     redirect(`/courses?${q.toString()}`);
   }
 
-  const page = Number(params.page) || 1;
-  const size = Number(params.size) || 20;
   const extraQuery = buildCourseSearchQuery(params);
+  const exportQuery = extraQuery;
   const search = searchFromParams(params);
 
   const courses = await fetchCourses(page, size, search);
@@ -94,6 +182,7 @@ export default async function CoursesPage({ searchParams }: CoursesPageProps) {
             srch_tra_end_dt: params.srch_tra_end_dt,
             srch_tra_organ_nm: params.srch_tra_organ_nm,
             srch_tra_process_nm: params.srch_tra_process_nm,
+            has_reg_course_man: hasRegCourseMan,
           }}
         />
       </section>
@@ -102,7 +191,7 @@ export default async function CoursesPage({ searchParams }: CoursesPageProps) {
         {"message" in courses ? (
           <p className="text-sm text-destructive">{courses.message}</p>
         ) : (
-          <CoursesList items={courses.items ?? []} />
+          <CoursesList items={courses.items ?? []} exportQuery={exportQuery} />
         )}
 
         <PagePagination

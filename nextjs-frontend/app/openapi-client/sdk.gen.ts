@@ -5,6 +5,7 @@ import {
   type Client,
   type TDataShape,
   urlSearchParamsBodySerializer,
+  formDataBodySerializer,
 } from "./client";
 import type {
   IssueRefreshTokenData,
@@ -74,6 +75,12 @@ import type {
   ListCoursesData,
   ListCoursesResponses,
   ListCoursesErrors,
+  SearchOwnedCoursesData,
+  SearchOwnedCoursesResponses,
+  SearchOwnedCoursesErrors,
+  ExportCoursesData,
+  ExportCoursesResponses,
+  ExportCoursesErrors,
   SearchCoursesData,
   SearchCoursesResponses,
   SearchCoursesErrors,
@@ -82,6 +89,26 @@ import type {
   EnqueueLegacyCourseIndexData,
   EnqueueLegacyCourseIndexResponses,
   EnqueueLegacyCourseIndexErrors,
+  ListOwnedCoursesData,
+  ListOwnedCoursesResponses,
+  ListOwnedCoursesErrors,
+  CreateOwnedCourseData,
+  CreateOwnedCourseResponses,
+  CreateOwnedCourseErrors,
+  DownloadImportTemplateData,
+  DownloadImportTemplateResponses,
+  ImportOwnedCoursesData,
+  ImportOwnedCoursesResponses,
+  ImportOwnedCoursesErrors,
+  DeleteOwnedCourseData,
+  DeleteOwnedCourseResponses,
+  DeleteOwnedCourseErrors,
+  GetOwnedCourseData,
+  GetOwnedCourseResponses,
+  GetOwnedCourseErrors,
+  UpdateOwnedCourseData,
+  UpdateOwnedCourseResponses,
+  UpdateOwnedCourseErrors,
   ListWork24ApiLogsData,
   ListWork24ApiLogsResponses,
   ListWork24ApiLogsErrors,
@@ -639,6 +666,52 @@ export const listCourses = <ThrowOnError extends boolean = false>(
 };
 
 /**
+ * Search Owned Courses
+ */
+export const searchOwnedCourses = <ThrowOnError extends boolean = false>(
+  options: Options<SearchOwnedCoursesData, ThrowOnError>,
+) => {
+  return (options.client ?? client).get<
+    SearchOwnedCoursesResponses,
+    SearchOwnedCoursesErrors,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/courses/owned-search",
+    ...options,
+  });
+};
+
+/**
+ * Export Courses
+ */
+export const exportCourses = <ThrowOnError extends boolean = false>(
+  options?: Options<ExportCoursesData, ThrowOnError>,
+) => {
+  return (options?.client ?? client).get<
+    ExportCoursesResponses,
+    ExportCoursesErrors,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/courses/export",
+    ...options,
+  });
+};
+
+/**
  * Search Courses
  */
 export const searchCourses = <ThrowOnError extends boolean = false>(
@@ -703,6 +776,179 @@ export const enqueueLegacyCourseIndex = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/courses/legacy-index",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+};
+
+/**
+ * List Owned Courses
+ */
+export const listOwnedCourses = <ThrowOnError extends boolean = false>(
+  options?: Options<ListOwnedCoursesData, ThrowOnError>,
+) => {
+  return (options?.client ?? client).get<
+    ListOwnedCoursesResponses,
+    ListOwnedCoursesErrors,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/owned-courses",
+    ...options,
+  });
+};
+
+/**
+ * Create Owned Course
+ */
+export const createOwnedCourse = <ThrowOnError extends boolean = false>(
+  options: Options<CreateOwnedCourseData, ThrowOnError>,
+) => {
+  return (options.client ?? client).post<
+    CreateOwnedCourseResponses,
+    CreateOwnedCourseErrors,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/owned-courses",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+};
+
+/**
+ * Download Import Template
+ */
+export const downloadImportTemplate = <ThrowOnError extends boolean = false>(
+  options?: Options<DownloadImportTemplateData, ThrowOnError>,
+) => {
+  return (options?.client ?? client).get<
+    DownloadImportTemplateResponses,
+    unknown,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/owned-courses/import/template",
+    ...options,
+  });
+};
+
+/**
+ * Import Owned Courses
+ */
+export const importOwnedCourses = <ThrowOnError extends boolean = false>(
+  options: Options<ImportOwnedCoursesData, ThrowOnError>,
+) => {
+  return (options.client ?? client).post<
+    ImportOwnedCoursesResponses,
+    ImportOwnedCoursesErrors,
+    ThrowOnError
+  >({
+    ...formDataBodySerializer,
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/owned-courses/import",
+    ...options,
+    headers: {
+      "Content-Type": null,
+      ...options.headers,
+    },
+  });
+};
+
+/**
+ * Delete Owned Course
+ */
+export const deleteOwnedCourse = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteOwnedCourseData, ThrowOnError>,
+) => {
+  return (options.client ?? client).delete<
+    DeleteOwnedCourseResponses,
+    DeleteOwnedCourseErrors,
+    ThrowOnError
+  >({
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/owned-courses/{course_id}",
+    ...options,
+  });
+};
+
+/**
+ * Get Owned Course
+ */
+export const getOwnedCourse = <ThrowOnError extends boolean = false>(
+  options: Options<GetOwnedCourseData, ThrowOnError>,
+) => {
+  return (options.client ?? client).get<
+    GetOwnedCourseResponses,
+    GetOwnedCourseErrors,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/owned-courses/{course_id}",
+    ...options,
+  });
+};
+
+/**
+ * Update Owned Course
+ */
+export const updateOwnedCourse = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateOwnedCourseData, ThrowOnError>,
+) => {
+  return (options.client ?? client).put<
+    UpdateOwnedCourseResponses,
+    UpdateOwnedCourseErrors,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/owned-courses/{course_id}",
     ...options,
     headers: {
       "Content-Type": "application/json",

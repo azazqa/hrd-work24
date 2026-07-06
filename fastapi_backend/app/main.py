@@ -6,6 +6,7 @@ from app.config import settings
 from app.routes.admin_scheduler import router as admin_scheduler_router
 from app.routes.auth_refresh import router as auth_refresh_router
 from app.routes.courses import router as courses_router
+from app.routes.owned_courses import router as owned_courses_router
 from app.routes.work24_api_logs import router as work24_api_logs_router
 from app.schemas import UserRead, UserUpdate
 from app.users import AUTH_URL_PATH, auth_backend, fastapi_users
@@ -56,6 +57,12 @@ app.include_router(
     courses_router,
     prefix="/courses",
     tags=["courses"],
+)
+
+app.include_router(
+    owned_courses_router,
+    prefix="/owned-courses",
+    tags=["owned-courses"],
 )
 
 app.include_router(

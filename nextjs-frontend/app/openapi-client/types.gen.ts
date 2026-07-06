@@ -59,6 +59,16 @@ export type BodyAuthVerifyVerify = {
 };
 
 /**
+ * Body_owned-courses-import_owned_courses
+ */
+export type BodyOwnedCoursesImportOwnedCourses = {
+  /**
+   * File
+   */
+  file: Blob | File;
+};
+
+/**
  * CourseIndexResult
  */
 export type CourseIndexResult = {
@@ -122,14 +132,17 @@ export type CourseListItem = {
   title_link?: string | null;
   /**
    * Reg Course Man
+   * 수강신청 인원 (Work24 regCourseMan)
    */
   reg_course_man?: string | null;
   /**
    * Yard Man
+   * 정원 (Work24 yardMan)
    */
   yard_man?: string | null;
   /**
    * Real Man
+   * 실제 훈련비 (Work24 realMan)
    */
   real_man?: string | null;
 };
@@ -250,6 +263,292 @@ export type LegacyIndexResponse = {
    * Message
    */
   message: string;
+};
+
+/**
+ * OwnedCourseCreate
+ */
+export type OwnedCourseCreate = {
+  /**
+   * Dev Year
+   */
+  dev_year?: number | null;
+  /**
+   * Dev Round
+   */
+  dev_round?: number | null;
+  /**
+   * Review Round
+   */
+  review_round?: string | null;
+  /**
+   * Division
+   */
+  division?: string | null;
+  /**
+   * Ncs Dev Category
+   */
+  ncs_dev_category?: string | null;
+  /**
+   * Course Name
+   */
+  course_name: string;
+  /**
+   * Session Count
+   */
+  session_count?: number | null;
+  /**
+   * Eval Training Volume
+   */
+  eval_training_volume?: string | null;
+  /**
+   * Result
+   */
+  result?: string | null;
+  /**
+   * Grade Initial
+   */
+  grade_initial?: string | null;
+  /**
+   * Grade 23
+   */
+  grade_23?: string | null;
+  /**
+   * Ncs Applied
+   */
+  ncs_applied?: string | null;
+  /**
+   * Ncs Approved
+   */
+  ncs_approved?: string | null;
+  /**
+   * Is Active
+   */
+  is_active?: boolean;
+};
+
+/**
+ * OwnedCourseImportError
+ */
+export type OwnedCourseImportError = {
+  /**
+   * Row
+   */
+  row: number;
+  /**
+   * Message
+   */
+  message: string;
+};
+
+/**
+ * OwnedCourseImportResult
+ */
+export type OwnedCourseImportResult = {
+  /**
+   * Created
+   */
+  created: number;
+  /**
+   * Updated
+   */
+  updated: number;
+  /**
+   * Failed
+   */
+  failed: number;
+  /**
+   * Errors
+   */
+  errors: Array<OwnedCourseImportError>;
+};
+
+/**
+ * OwnedCourseListItem
+ */
+export type OwnedCourseListItem = {
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Dev Year
+   */
+  dev_year: number | null;
+  /**
+   * Division
+   */
+  division: string | null;
+  /**
+   * Course Name
+   */
+  course_name: string;
+  /**
+   * Is Active
+   */
+  is_active: boolean;
+};
+
+/**
+ * OwnedCourseRead
+ */
+export type OwnedCourseRead = {
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Dev Year
+   */
+  dev_year: number | null;
+  /**
+   * Dev Round
+   */
+  dev_round: number | null;
+  /**
+   * Review Round
+   */
+  review_round: string | null;
+  /**
+   * Division
+   */
+  division: string | null;
+  /**
+   * Ncs Dev Category
+   */
+  ncs_dev_category: string | null;
+  /**
+   * Course Name
+   */
+  course_name: string;
+  /**
+   * Session Count
+   */
+  session_count: number | null;
+  /**
+   * Eval Training Volume
+   */
+  eval_training_volume: string | null;
+  /**
+   * Result
+   */
+  result: string | null;
+  /**
+   * Grade Initial
+   */
+  grade_initial: string | null;
+  /**
+   * Grade 23
+   */
+  grade_23: string | null;
+  /**
+   * Ncs Applied
+   */
+  ncs_applied: string | null;
+  /**
+   * Ncs Approved
+   */
+  ncs_approved: string | null;
+  /**
+   * Is Active
+   */
+  is_active: boolean;
+  /**
+   * Created At
+   */
+  created_at: string;
+  /**
+   * Updated At
+   */
+  updated_at: string;
+};
+
+/**
+ * OwnedCourseUpdate
+ */
+export type OwnedCourseUpdate = {
+  /**
+   * Dev Year
+   */
+  dev_year?: number | null;
+  /**
+   * Dev Round
+   */
+  dev_round?: number | null;
+  /**
+   * Review Round
+   */
+  review_round?: string | null;
+  /**
+   * Division
+   */
+  division?: string | null;
+  /**
+   * Ncs Dev Category
+   */
+  ncs_dev_category?: string | null;
+  /**
+   * Course Name
+   */
+  course_name?: string | null;
+  /**
+   * Session Count
+   */
+  session_count?: number | null;
+  /**
+   * Eval Training Volume
+   */
+  eval_training_volume?: string | null;
+  /**
+   * Result
+   */
+  result?: string | null;
+  /**
+   * Grade Initial
+   */
+  grade_initial?: string | null;
+  /**
+   * Grade 23
+   */
+  grade_23?: string | null;
+  /**
+   * Ncs Applied
+   */
+  ncs_applied?: string | null;
+  /**
+   * Ncs Approved
+   */
+  ncs_approved?: string | null;
+  /**
+   * Is Active
+   */
+  is_active?: boolean | null;
+};
+
+/**
+ * Page[OwnedCourseListItem]
+ */
+export type PageOwnedCourseListItem = {
+  /**
+   * Items
+   */
+  items: Array<OwnedCourseListItem>;
+  /**
+   * Total
+   */
+  total?: number | null;
+  /**
+   * Page
+   */
+  page: number | null;
+  /**
+   * Size
+   */
+  size: number | null;
+  /**
+   * Pages
+   */
+  pages?: number | null;
 };
 
 /**
@@ -1402,6 +1701,11 @@ export type ListCoursesData = {
      */
     srch_tra_process_nm?: string | null;
     /**
+     * Has Reg Course Man
+     * 수강신청 인원 있음 (regCourseMan > 0)
+     */
+    has_reg_course_man?: boolean;
+    /**
      * Page Num
      */
     page_num?: number;
@@ -1431,6 +1735,116 @@ export type ListCoursesResponses = {
 
 export type ListCoursesResponse =
   ListCoursesResponses[keyof ListCoursesResponses];
+
+export type SearchOwnedCoursesData = {
+  body?: never;
+  path?: never;
+  query: {
+    /**
+     * Year
+     * 훈련시작일 기준 조회 년도
+     */
+    year: number;
+    /**
+     * Min Score
+     * 관련도 임계치 (0이면 미적용)
+     */
+    min_score?: number;
+    /**
+     * Has Reg Course Man
+     * 수강신청 인원 있음 (regCourseMan > 0)
+     */
+    has_reg_course_man?: boolean;
+    /**
+     * Page Num
+     */
+    page_num?: number;
+    /**
+     * Page Size
+     */
+    page_size?: number;
+  };
+  url: "/courses/owned-search";
+};
+
+export type SearchOwnedCoursesErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type SearchOwnedCoursesError =
+  SearchOwnedCoursesErrors[keyof SearchOwnedCoursesErrors];
+
+export type SearchOwnedCoursesResponses = {
+  /**
+   * Successful Response
+   */
+  200: CourseListResponse;
+};
+
+export type SearchOwnedCoursesResponse =
+  SearchOwnedCoursesResponses[keyof SearchOwnedCoursesResponses];
+
+export type ExportCoursesData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Srch Tra St Dt
+     * 훈련시작일 From (YYYYMMDD 또는 YYYY-MM-DD)
+     */
+    srch_tra_st_dt?: string | null;
+    /**
+     * Srch Tra End Dt
+     * 훈련시작일 To (YYYYMMDD 또는 YYYY-MM-DD)
+     */
+    srch_tra_end_dt?: string | null;
+    /**
+     * Srch Tra Organ Nm
+     * 훈련기관명
+     */
+    srch_tra_organ_nm?: string | null;
+    /**
+     * Srch Tra Process Nm
+     * 훈련과정명
+     */
+    srch_tra_process_nm?: string | null;
+    /**
+     * Has Reg Course Man
+     * 수강신청 인원 있음 (regCourseMan > 0)
+     */
+    has_reg_course_man?: boolean;
+    /**
+     * Owned Year
+     * 보유 과정 조회 년도
+     */
+    owned_year?: number | null;
+    /**
+     * Min Score
+     * 관련도 임계치 (보유 과정 조회)
+     */
+    min_score?: number;
+  };
+  url: "/courses/export";
+};
+
+export type ExportCoursesErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type ExportCoursesError = ExportCoursesErrors[keyof ExportCoursesErrors];
+
+export type ExportCoursesResponses = {
+  /**
+   * Successful Response
+   */
+  200: unknown;
+};
 
 export type SearchCoursesData = {
   body?: never;
@@ -1511,6 +1925,225 @@ export type EnqueueLegacyCourseIndexResponses = {
 
 export type EnqueueLegacyCourseIndexResponse =
   EnqueueLegacyCourseIndexResponses[keyof EnqueueLegacyCourseIndexResponses];
+
+export type ListOwnedCoursesData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Page
+     * Page number
+     */
+    page?: number;
+    /**
+     * Size
+     * Page size
+     */
+    size?: number;
+    /**
+     * Q
+     * 과정명 검색
+     */
+    q?: string | null;
+    /**
+     * Is Active
+     */
+    is_active?: boolean | null;
+    /**
+     * Dev Year
+     */
+    dev_year?: number | null;
+    /**
+     * Division
+     */
+    division?: string | null;
+  };
+  url: "/owned-courses";
+};
+
+export type ListOwnedCoursesErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type ListOwnedCoursesError =
+  ListOwnedCoursesErrors[keyof ListOwnedCoursesErrors];
+
+export type ListOwnedCoursesResponses = {
+  /**
+   * Successful Response
+   */
+  200: PageOwnedCourseListItem;
+};
+
+export type ListOwnedCoursesResponse =
+  ListOwnedCoursesResponses[keyof ListOwnedCoursesResponses];
+
+export type CreateOwnedCourseData = {
+  body: OwnedCourseCreate;
+  path?: never;
+  query?: never;
+  url: "/owned-courses";
+};
+
+export type CreateOwnedCourseErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type CreateOwnedCourseError =
+  CreateOwnedCourseErrors[keyof CreateOwnedCourseErrors];
+
+export type CreateOwnedCourseResponses = {
+  /**
+   * Successful Response
+   */
+  201: OwnedCourseRead;
+};
+
+export type CreateOwnedCourseResponse =
+  CreateOwnedCourseResponses[keyof CreateOwnedCourseResponses];
+
+export type DownloadImportTemplateData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/owned-courses/import/template";
+};
+
+export type DownloadImportTemplateResponses = {
+  /**
+   * Successful Response
+   */
+  200: unknown;
+};
+
+export type ImportOwnedCoursesData = {
+  body: BodyOwnedCoursesImportOwnedCourses;
+  path?: never;
+  query?: never;
+  url: "/owned-courses/import";
+};
+
+export type ImportOwnedCoursesErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type ImportOwnedCoursesError =
+  ImportOwnedCoursesErrors[keyof ImportOwnedCoursesErrors];
+
+export type ImportOwnedCoursesResponses = {
+  /**
+   * Successful Response
+   */
+  200: OwnedCourseImportResult;
+};
+
+export type ImportOwnedCoursesResponse =
+  ImportOwnedCoursesResponses[keyof ImportOwnedCoursesResponses];
+
+export type DeleteOwnedCourseData = {
+  body?: never;
+  path: {
+    /**
+     * Course Id
+     */
+    course_id: number;
+  };
+  query?: never;
+  url: "/owned-courses/{course_id}";
+};
+
+export type DeleteOwnedCourseErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type DeleteOwnedCourseError =
+  DeleteOwnedCourseErrors[keyof DeleteOwnedCourseErrors];
+
+export type DeleteOwnedCourseResponses = {
+  /**
+   * Successful Response
+   */
+  204: void;
+};
+
+export type DeleteOwnedCourseResponse =
+  DeleteOwnedCourseResponses[keyof DeleteOwnedCourseResponses];
+
+export type GetOwnedCourseData = {
+  body?: never;
+  path: {
+    /**
+     * Course Id
+     */
+    course_id: number;
+  };
+  query?: never;
+  url: "/owned-courses/{course_id}";
+};
+
+export type GetOwnedCourseErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type GetOwnedCourseError =
+  GetOwnedCourseErrors[keyof GetOwnedCourseErrors];
+
+export type GetOwnedCourseResponses = {
+  /**
+   * Successful Response
+   */
+  200: OwnedCourseRead;
+};
+
+export type GetOwnedCourseResponse =
+  GetOwnedCourseResponses[keyof GetOwnedCourseResponses];
+
+export type UpdateOwnedCourseData = {
+  body: OwnedCourseUpdate;
+  path: {
+    /**
+     * Course Id
+     */
+    course_id: number;
+  };
+  query?: never;
+  url: "/owned-courses/{course_id}";
+};
+
+export type UpdateOwnedCourseErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type UpdateOwnedCourseError =
+  UpdateOwnedCourseErrors[keyof UpdateOwnedCourseErrors];
+
+export type UpdateOwnedCourseResponses = {
+  /**
+   * Successful Response
+   */
+  200: OwnedCourseRead;
+};
+
+export type UpdateOwnedCourseResponse =
+  UpdateOwnedCourseResponses[keyof UpdateOwnedCourseResponses];
 
 export type ListWork24ApiLogsData = {
   body?: never;

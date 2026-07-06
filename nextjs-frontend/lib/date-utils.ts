@@ -86,9 +86,19 @@ export function getDefaultTraStartDateRange(): { start: string; end: string } {
   };
 }
 
-const TRA_START_YEAR_MIN = 2020;
+const TRA_START_YEAR_MIN = 2023;
 
-/** 과정 조회 훈련시작일 캘린더: 2020년 1월 ~ 내년 12월 (Asia/Seoul 기준) */
+/** 보유과정 조회·훈련시작일 년도 선택 옵션 (2023 ~ 현재, 내림차순) */
+export function getTraYearOptions(): number[] {
+  const currentYear = dayjs().tz(DISPLAY_TIMEZONE).year();
+  const years: number[] = [];
+  for (let y = currentYear; y >= TRA_START_YEAR_MIN; y -= 1) {
+    years.push(y);
+  }
+  return years;
+}
+
+/** 과정 조회 훈련시작일 캘린더: 2023년 1월 ~ 내년 12월 (Asia/Seoul 기준) */
 export function getTraStartCalendarBounds(): {
   startMonth: Date;
   endMonth: Date;
