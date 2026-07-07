@@ -151,6 +151,24 @@ def _to_es_date(value: str) -> str:
     return value
 
 
+def _tra_start_date_range(gte: str, lte: str) -> dict:
+    """훈련시작일 range. ES에 YYYYMMDD(Work24 원본) / YYYY-MM-DD 혼재 대응."""
+    iso_gte = _to_es_date(gte)
+    iso_lte = _to_es_date(lte)
+    clauses: list[dict] = [
+        {"range": {"traStartDate": {"gte": iso_gte, "lte": iso_lte}}},
+    ]
+    if gte != iso_gte or lte != iso_lte:
+        clauses.append({"range": {"traStartDate": {"gte": gte, "lte": lte}}})
+    if len(clauses) == 1:
+        return clauses[0]
+    return {"bool": {"should": clauses, "minimum_should_match": 1}}
+
+
+def _tra_start_date_year_filter(year: int) -> dict:
+    return _tra_start_date_range(f"{year}0101", f"{year}1231")
+
+
 _COURSE_ID_SORT_FIELDS = ("trainstCstId", "trprId", "trprDegr")
 
 
@@ -198,14 +216,7 @@ def _build_list_query(
     has_reg_course_man: bool = False,
 ) -> dict:
     must: list[dict] = [
-        {
-            "range": {
-                "traStartDate": {
-                    "gte": _to_es_date(st_dt),
-                    "lte": _to_es_date(end_dt),
-                }
-            }
-        }
+        _tra_start_date_range(st_dt, end_dt),
     ]
     if organ_nm and organ_nm.strip():
         must.append(
@@ -319,14 +330,7 @@ def _build_owned_match_query(
 ) -> tuple[dict, float | None]:
     should = [_build_owned_name_clause(name) for name in names]
     filters: list[dict] = [
-        {
-            "range": {
-                "traStartDate": {
-                    "gte": f"{year}-01-01",
-                    "lte": f"{year}-12-31",
-                }
-            }
-        }
+        _tra_start_date_year_filter(year),
     ]
     if has_reg_course_man:
         filters.append(_reg_course_man_gt_zero_filter())

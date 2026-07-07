@@ -122,10 +122,22 @@ def _course_doc_id(item: dict[str, Any]) -> str:
     return f"{trainst_cst_id}_{trpr_id}_{trpr_degr}"
 
 
+def _normalize_stored_date(value: Any) -> Any:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if len(text) == 8 and text.isdigit():
+        return f"{text[:4]}-{text[4:6]}-{text[6:8]}"
+    return value
+
+
 def _to_source(item: dict[str, Any]) -> dict[str, Any]:
     source = dict(item)
     source["trngCrseNm"] = item.get("title", "")
     source["instNm"] = item.get("subTitle", "")
+    for key in ("traStartDate", "traEndDate"):
+        if key in source:
+            source[key] = _normalize_stored_date(source[key])
     return source
 
 
