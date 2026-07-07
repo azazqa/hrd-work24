@@ -74,7 +74,18 @@ COURSE_INDEX_BODY: dict[str, Any] = {
                     "raw": {"type": "keyword"},
                 },
             },
-            "trprId": {"type": "keyword"},
+            "trainstCstId": {
+                "type": "text",
+                "fields": {"keyword": {"type": "keyword", "ignore_above": 256}},
+            },
+            "trprId": {
+                "type": "text",
+                "fields": {"keyword": {"type": "keyword", "ignore_above": 256}},
+            },
+            "trprDegr": {
+                "type": "text",
+                "fields": {"keyword": {"type": "keyword", "ignore_above": 256}},
+            },
             "instNm": {"type": "keyword"},
             "traStartDate": {"type": "date"},
         }

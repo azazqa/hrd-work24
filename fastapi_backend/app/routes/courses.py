@@ -151,6 +151,19 @@ def _to_es_date(value: str) -> str:
     return value
 
 
+_COURSE_ID_SORT_FIELDS = ("trainstCstId", "trprId", "trprDegr")
+
+
+def _course_id_sort(*, include_score: bool = False) -> list[dict]:
+    """TRAINST_CST_ID → TRPR_ID → TRPR_DEGR 순 정렬 (.keyword: text 매핑 인덱스 호환)."""
+    sort: list[dict] = []
+    if include_score:
+        sort.append({"_score": "desc"})
+    for field in _COURSE_ID_SORT_FIELDS:
+        sort.append({f"{field}.keyword": {"order": "asc", "missing": "_last"}})
+    return sort
+
+
 def _reg_course_man_gt_zero_filter() -> dict:
     """Work24 regCourseMan(문자열)이 0보다 큰 문서만 필터."""
     return {
@@ -231,7 +244,7 @@ def _build_list_body(
         ),
         "from": (page_num - 1) * page_size,
         "size": page_size,
-        "sort": [{"traStartDate": "asc"}, {"trprId": "asc"}],
+        "sort": _course_id_sort(),
         "track_total_hits": True,
     }
 
@@ -248,7 +261,7 @@ def _build_list_scroll_body(
             st_dt, end_dt, organ_nm, process_nm, has_reg_course_man
         ),
         "size": SCROLL_BATCH_SIZE,
-        "sort": [{"traStartDate": "asc"}, {"trprId": "asc"}],
+        "sort": _course_id_sort(),
         "track_total_hits": True,
     }
 
@@ -344,7 +357,7 @@ def _build_owned_match_body(
         "query": query,
         "from": (page_num - 1) * page_size,
         "size": page_size,
-        "sort": [{"_score": "desc"}, {"traStartDate": "asc"}, {"trprId": "asc"}],
+        "sort": _course_id_sort(include_score=True),
         "track_total_hits": True,
     }
     if min_score_value is not None:
@@ -364,7 +377,7 @@ def _build_owned_scroll_body(
     body: dict = {
         "query": query,
         "size": SCROLL_BATCH_SIZE,
-        "sort": [{"_score": "desc"}, {"traStartDate": "asc"}, {"trprId": "asc"}],
+        "sort": _course_id_sort(include_score=True),
         "track_total_hits": True,
     }
     if min_score_value is not None:

@@ -1,6 +1,23 @@
 import json
 
-from app.routes.courses import _build_owned_match_body, _build_owned_name_clause
+from app.routes.courses import (
+    _build_owned_match_body,
+    _build_owned_name_clause,
+    _course_id_sort,
+)
+
+
+def test_course_id_sort_order():
+    assert _course_id_sort() == [
+        {"trainstCstId.keyword": {"order": "asc", "missing": "_last"}},
+        {"trprId.keyword": {"order": "asc", "missing": "_last"}},
+        {"trprDegr.keyword": {"order": "asc", "missing": "_last"}},
+    ]
+
+
+def test_course_id_sort_with_score():
+    assert _course_id_sort(include_score=True)[0] == {"_score": "desc"}
+    assert len(_course_id_sort(include_score=True)) == 4
 
 
 def test_owned_name_clause_uses_substring_not_ngram():
