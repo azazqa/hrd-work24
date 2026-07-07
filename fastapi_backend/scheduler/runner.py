@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.models import SchedulerJobQueue
 from scheduler.db import build_scheduler_engine
-from scheduler.queue_processor import process_pending_queue
+from scheduler.queue_processor import KNOWN_JOB_KEYS, process_pending_queue
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,8 +23,6 @@ logging.basicConfig(
 logger = logging.getLogger("scheduler.runner")
 
 scheduler = BlockingScheduler(timezone="Asia/Seoul")
-
-DEFAULT_JOB_KEY = "course_index_refresh"
 
 
 def _on_job_executed(event) -> None:
@@ -46,33 +44,46 @@ def _shutdown(signum, frame) -> None:
     sys.exit(0)
 
 
-def _load_job_schedule(engine, *, job_key: str) -> tuple[bool, int, int, str]:
+def _load_enabled_job_schedules(engine) -> list[tuple[str, int, int, str]]:
+    """
+    scheduler_jobs에 등록·활성화된 job만 cron 대상으로 반환한다.
+    (job_key, cron_hour, cron_minute, timezone)
+    """
     try:
         with engine.connect() as c:
-            row = (
+            rows = (
                 c.execute(
                     text(
                         """
-                    SELECT enabled, cron_hour, cron_minute, timezone
+                    SELECT job_key, cron_hour, cron_minute, timezone
                       FROM scheduler_jobs
-                     WHERE job_key = :job_key AND is_delete = false
+                     WHERE is_delete = false AND enabled = true
+                     ORDER BY job_key
                     """
-                    ),
-                    {"job_key": job_key},
+                    )
                 )
                 .mappings()
-                .first()
+                .all()
             )
     except Exception:
         logger.warning(
-            "[RUNNER] could not read scheduler_jobs; using default 03:00 Asia/Seoul (enabled)",
+            "[RUNNER] could not read scheduler_jobs; no cron jobs scheduled",
             exc_info=True,
         )
-        return True, 3, 0, "Asia/Seoul"
-    if row is None:
-        return True, 3, 0, "Asia/Seoul"
-    tz = row.get("timezone") or "Asia/Seoul"
-    return bool(row["enabled"]), int(row["cron_hour"]), int(row["cron_minute"]), str(tz)
+        return []
+
+    schedules: list[tuple[str, int, int, str]] = []
+    for row in rows:
+        job_key = str(row["job_key"])
+        if job_key not in KNOWN_JOB_KEYS:
+            logger.warning(
+                "[RUNNER] unknown job_key in scheduler_jobs: %s; skipping cron",
+                job_key,
+            )
+            continue
+        tz = row.get("timezone") or "Asia/Seoul"
+        schedules.append((job_key, int(row["cron_hour"]), int(row["cron_minute"]), str(tz)))
+    return schedules
 
 
 def _tick_queue() -> None:
@@ -105,30 +116,30 @@ def main() -> None:
     scheduler.add_listener(_on_job_error, EVENT_JOB_ERROR)
 
     engine = build_scheduler_engine()
-    enabled, cron_hour, cron_minute, tz = _load_job_schedule(engine, job_key=DEFAULT_JOB_KEY)
+    schedules = _load_enabled_job_schedules(engine)
 
-    if enabled:
-        scheduler.add_job(
-            _enqueue_scheduled_job,
-            CronTrigger(hour=cron_hour, minute=cron_minute, timezone=tz),
-            kwargs={"job_key": DEFAULT_JOB_KEY, "engine": engine},
-            id=DEFAULT_JOB_KEY,
-            name="고용24 과정 수집 큐 등록",
-            max_instances=1,
-            misfire_grace_time=600,
-            replace_existing=True,
-        )
-        logger.info(
-            "[RUNNER] %s cron: %02d:%02d %s",
-            DEFAULT_JOB_KEY,
-            cron_hour,
-            cron_minute,
-            tz,
-        )
+    if schedules:
+        for job_key, cron_hour, cron_minute, tz in schedules:
+            scheduler.add_job(
+                _enqueue_scheduled_job,
+                CronTrigger(hour=cron_hour, minute=cron_minute, timezone=tz),
+                kwargs={"job_key": job_key, "engine": engine},
+                id=job_key,
+                name=f"Scheduled enqueue: {job_key}",
+                max_instances=1,
+                misfire_grace_time=600,
+                replace_existing=True,
+            )
+            logger.info(
+                "[RUNNER] %s cron: %02d:%02d %s",
+                job_key,
+                cron_hour,
+                cron_minute,
+                tz,
+            )
     else:
         logger.info(
-            "[RUNNER] %s cron disabled in scheduler_jobs; queue / manual enqueue only",
-            DEFAULT_JOB_KEY,
+            "[RUNNER] no enabled jobs in scheduler_jobs; queue / manual enqueue only"
         )
 
     scheduler.add_job(
