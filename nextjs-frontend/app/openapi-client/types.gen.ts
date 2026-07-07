@@ -276,7 +276,7 @@ export type OwnedCourseCreate = {
   /**
    * Dev Round
    */
-  dev_round?: number | null;
+  dev_round?: string | null;
   /**
    * Review Round
    */
@@ -404,7 +404,7 @@ export type OwnedCourseRead = {
   /**
    * Dev Round
    */
-  dev_round: number | null;
+  dev_round: string | null;
   /**
    * Review Round
    */
@@ -474,7 +474,7 @@ export type OwnedCourseUpdate = {
   /**
    * Dev Round
    */
-  dev_round?: number | null;
+  dev_round?: string | null;
   /**
    * Review Round
    */

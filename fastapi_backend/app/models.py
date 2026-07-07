@@ -106,7 +106,7 @@ class OwnedCourse(Base):
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     dev_year = Column(Integer, nullable=True, index=True)
-    dev_round = Column(Integer, nullable=True)
+    dev_round = Column(String(50), nullable=True)
     review_round = Column(String(50), nullable=True)
     division = Column(String(100), nullable=True, index=True)
     ncs_dev_category = Column(String(100), nullable=True)

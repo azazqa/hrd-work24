@@ -88,7 +88,7 @@ function toPayload(form: OwnedCourseFormValues) {
   }
   return {
     dev_year: parseOptionalInt(form.dev_year),
-    dev_round: parseOptionalInt(form.dev_round),
+    dev_round: parseOptionalStr(form.dev_round),
     review_round: parseOptionalStr(form.review_round),
     division: parseOptionalStr(form.division),
     ncs_dev_category: parseOptionalStr(form.ncs_dev_category),
@@ -194,7 +194,6 @@ export function OwnedCourseForm({ mode, courseId, initial }: Props) {
             <FieldLabel htmlFor="dev_round">개발차수</FieldLabel>
             <Input
               id="dev_round"
-              type="number"
               value={form.dev_round}
               onChange={(e) => setField("dev_round", e.target.value)}
             />

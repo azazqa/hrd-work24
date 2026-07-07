@@ -52,7 +52,7 @@ class OwnedCourseRead(BaseModel):
 
     id: int
     dev_year: int | None
-    dev_round: int | None
+    dev_round: str | None
     review_round: str | None
     division: str | None
     ncs_dev_category: str | None
@@ -71,7 +71,7 @@ class OwnedCourseRead(BaseModel):
 
 class OwnedCourseCreate(BaseModel):
     dev_year: int | None = None
-    dev_round: int | None = None
+    dev_round: str | None = Field(default=None, max_length=50)
     review_round: str | None = Field(default=None, max_length=50)
     division: str | None = Field(default=None, max_length=100)
     ncs_dev_category: str | None = Field(default=None, max_length=100)
@@ -88,7 +88,7 @@ class OwnedCourseCreate(BaseModel):
 
 class OwnedCourseUpdate(BaseModel):
     dev_year: int | None = None
-    dev_round: int | None = None
+    dev_round: str | None = Field(default=None, max_length=50)
     review_round: str | None = Field(default=None, max_length=50)
     division: str | None = Field(default=None, max_length=100)
     ncs_dev_category: str | None = Field(default=None, max_length=100)
@@ -155,7 +155,7 @@ def _row_to_fields(row_values: dict[str, Any]) -> dict[str, Any]:
     data: dict[str, Any] = {}
     for field in FIELD_TO_HEADER:
         raw = row_values.get(field)
-        if field in ("dev_year", "dev_round", "session_count"):
+        if field in ("dev_year", "session_count"):
             parsed = _parse_int(raw)
             if parsed is not None:
                 data[field] = parsed

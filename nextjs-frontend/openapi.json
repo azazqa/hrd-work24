@@ -2694,7 +2694,8 @@
           "dev_round": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string",
+                "maxLength": 50
               },
               {
                 "type": "null"
@@ -2955,7 +2956,7 @@
           "dev_round": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -3130,7 +3131,8 @@
           "dev_round": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string",
+                "maxLength": 50
               },
               {
                 "type": "null"
