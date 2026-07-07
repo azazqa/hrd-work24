@@ -37,12 +37,12 @@ export function OwnedCoursesList({ items }: Props) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-20">ID</TableHead>
-            <TableHead className="w-24">개발년도</TableHead>
-            <TableHead className="w-28">구분</TableHead>
-            <TableHead>과정명</TableHead>
-            <TableHead className="w-24">사용여부</TableHead>
-            <TableHead className="w-20 text-right">관리</TableHead>
+            <TableHead className="w-20 text-center">ID</TableHead>
+            <TableHead className="w-24 text-center">개발년도</TableHead>
+            <TableHead className="w-28 text-center">구분</TableHead>
+            <TableHead className="text-center">과정명</TableHead>
+            <TableHead className="w-24 text-center">사용여부</TableHead>
+            <TableHead className="w-20 text-center">관리</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -55,11 +55,11 @@ export function OwnedCoursesList({ items }: Props) {
           ) : (
             items.map((row) => (
               <TableRow key={row.id}>
-                <TableCell>{row.id}</TableCell>
-                <TableCell>{row.dev_year ?? "-"}</TableCell>
-                <TableCell>{row.division ?? "-"}</TableCell>
+                <TableCell className="text-center">{row.id}</TableCell>
+                <TableCell className="text-center">{row.dev_year ?? "-"}</TableCell>
+                <TableCell className="text-center">{row.division ?? "-"}</TableCell>
                 <TableCell className="max-w-[360px]">{row.course_name}</TableCell>
-                <TableCell>
+                <TableCell className="text-center">
                   <span
                     className={
                       row.is_active
@@ -70,7 +70,7 @@ export function OwnedCoursesList({ items }: Props) {
                     {row.is_active ? "사용" : "미사용"}
                   </span>
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-center">
                   <Button variant="outline" size="sm" asChild>
                     <Link href={`/owned-courses/${row.id}/edit`}>수정</Link>
                   </Button>

@@ -89,8 +89,8 @@ export function ExcelImportDialog() {
         </DialogHeader>
         <div className="space-y-4 text-sm">
           <p className="text-muted-foreground">
-            양식을 다운로드한 뒤 데이터를 입력하고 업로드하세요. id 열이 있으면
-            기존 데이터를 수정합니다.
+            양식을 다운로드한 뒤 데이터를 입력하고 업로드하세요. 과정명·개발년도가
+            같으면 기존 데이터를 수정하고, 없으면 새로 등록합니다.
           </p>
           <Button variant="secondary" asChild>
             <a href="/api/owned-courses/import/template" download>

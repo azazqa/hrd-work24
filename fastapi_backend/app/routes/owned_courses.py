@@ -20,7 +20,6 @@ from app.users import current_active_user
 router = APIRouter()
 
 EXCEL_HEADERS: list[tuple[str, str]] = [
-    ("id", "id"),
     ("개발년도", "dev_year"),
     ("개발차수", "dev_round"),
     ("심사차수", "review_round"),
@@ -34,7 +33,6 @@ EXCEL_HEADERS: list[tuple[str, str]] = [
     ("등급(23)", "grade_23"),
     ("NCS(신청)", "ncs_applied"),
     ("NCS(인정)", "ncs_approved"),
-    ("사용여부", "is_active"),
 ]
 
 HEADER_TO_FIELD = {label: field for label, field in EXCEL_HEADERS}
@@ -131,21 +129,6 @@ def _transform_list(rows: list[OwnedCourse]) -> list[OwnedCourseListItem]:
     return [_to_list_item(r) for r in rows]
 
 
-def _parse_bool(value: Any) -> bool | None:
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float)):
-        return bool(int(value))
-    s = str(value).strip().lower()
-    if s in ("y", "yes", "true", "1", "t", "사용", "o"):
-        return True
-    if s in ("n", "no", "false", "0", "f", "미사용", "x"):
-        return False
-    return None
-
-
 def _parse_int(value: Any) -> int | None:
     if value is None or value == "":
         return None
@@ -171,14 +154,8 @@ def _parse_str(value: Any) -> str | None:
 def _row_to_fields(row_values: dict[str, Any]) -> dict[str, Any]:
     data: dict[str, Any] = {}
     for field in FIELD_TO_HEADER:
-        if field == "id":
-            continue
         raw = row_values.get(field)
-        if field == "is_active":
-            parsed = _parse_bool(raw)
-            if parsed is not None:
-                data[field] = parsed
-        elif field in ("dev_year", "dev_round", "session_count"):
+        if field in ("dev_year", "dev_round", "session_count"):
             parsed = _parse_int(raw)
             if parsed is not None:
                 data[field] = parsed
@@ -187,6 +164,25 @@ def _row_to_fields(row_values: dict[str, Any]) -> dict[str, Any]:
             if parsed is not None:
                 data[field] = parsed
     return data
+
+
+async def _find_existing_for_import(
+    session: AsyncSession,
+    *,
+    course_name: str,
+    dev_year: int | None,
+) -> OwnedCourse | str:
+    """과정명(+개발년도)으로 기존 행을 찾는다. 'ambiguous'면 동명이 2건 이상."""
+    stmt = select(OwnedCourse).where(
+        OwnedCourse.is_delete == False,  # noqa: E712
+        OwnedCourse.course_name == course_name,
+    )
+    if dev_year is not None:
+        stmt = stmt.where(OwnedCourse.dev_year == dev_year)
+    rows = list((await session.scalars(stmt)).all())
+    if len(rows) > 1:
+        return "ambiguous"
+    return rows[0] if rows else None
 
 
 @router.get("", response_model=Page[OwnedCourseListItem])
@@ -295,25 +291,27 @@ async def import_owned_courses(
         try:
             fields = _row_to_fields(row_values)
             fields["course_name"] = course_name
-            if "is_active" not in fields:
-                fields["is_active"] = True
+            fields["is_active"] = True
 
-            row_id_raw = row_values.get("id")
-            row_id = _parse_int(row_id_raw) if row_id_raw not in (None, "") else None
-
-            if row_id is not None:
-                existing = await session.get(OwnedCourse, row_id)
-                if existing is not None and not existing.is_delete:
-                    for k, v in fields.items():
-                        setattr(existing, k, v)
-                    updated += 1
-                else:
-                    row_obj = OwnedCourse(id=row_id, **fields)
-                    session.add(row_obj)
-                    created += 1
+            dev_year = fields.get("dev_year")
+            existing = await _find_existing_for_import(
+                session, course_name=course_name, dev_year=dev_year
+            )
+            if existing == "ambiguous":
+                failed += 1
+                errors.append(
+                    OwnedCourseImportError(
+                        row=row_num,
+                        message="동일 과정명(개발년도)이 여러 건입니다. 화면에서 개별 수정하세요.",
+                    )
+                )
+                continue
+            if existing is not None:
+                for k, v in fields.items():
+                    setattr(existing, k, v)
+                updated += 1
             else:
-                row_obj = OwnedCourse(**fields)
-                session.add(row_obj)
+                session.add(OwnedCourse(**fields))
                 created += 1
         except Exception as exc:
             failed += 1
