@@ -151,46 +151,13 @@ def _to_es_date(value: str) -> str:
     return value
 
 
-TRA_START_DATE_RUNTIME_MAPPING: dict = {
-    "traStartDateCompact": {
-        "type": "keyword",
-        "script": {
-            "lang": "painless",
-            "source": (
-                "def keys = ['traStartDate', 'traStDt', 'tra_start_date'];"
-                "for (def key : keys) {"
-                "  if (!params._source.containsKey(key) || params._source[key] == null) {"
-                "    continue;"
-                "  }"
-                "  def s = params._source[key].toString()"
-                "    .replace('-', '').replace('.', '');"
-                "  if (s.length() >= 8) {"
-                "    emit(s.substring(0, 8));"
-                "    return;"
-                "  }"
-                "}"
-            ),
-        },
-    }
-}
-
-
-def _attach_search_runtime_mappings(body: dict) -> dict:
-    merged = dict(body)
-    merged["runtime_mappings"] = {
-        **TRA_START_DATE_RUNTIME_MAPPING,
-        **merged.get("runtime_mappings", {}),
-    }
-    return merged
-
-
 def _tra_start_date_range(gte: str, lte: str) -> dict:
-    """_source 기반 runtime field(traStartDateCompact)로 YYYYMMDD range."""
+    """traStartDate(date) 필드 range — ISO YYYY-MM-DD."""
     return {
         "range": {
-            "traStartDateCompact": {
-                "gte": gte,
-                "lte": lte,
+            "traStartDate": {
+                "gte": _to_es_date(gte),
+                "lte": _to_es_date(lte),
             }
         }
     }
@@ -280,17 +247,15 @@ def _build_list_body(
     page_size: int,
     has_reg_course_man: bool = False,
 ) -> dict:
-    return _attach_search_runtime_mappings(
-        {
-            "query": _build_list_query(
-                st_dt, end_dt, organ_nm, process_nm, has_reg_course_man
-            ),
-            "from": (page_num - 1) * page_size,
-            "size": page_size,
-            "sort": _course_id_sort(),
-            "track_total_hits": True,
-        }
-    )
+    return {
+        "query": _build_list_query(
+            st_dt, end_dt, organ_nm, process_nm, has_reg_course_man
+        ),
+        "from": (page_num - 1) * page_size,
+        "size": page_size,
+        "sort": _course_id_sort(),
+        "track_total_hits": True,
+    }
 
 
 def _build_list_scroll_body(
@@ -300,16 +265,14 @@ def _build_list_scroll_body(
     process_nm: str | None,
     has_reg_course_man: bool = False,
 ) -> dict:
-    return _attach_search_runtime_mappings(
-        {
-            "query": _build_list_query(
-                st_dt, end_dt, organ_nm, process_nm, has_reg_course_man
-            ),
-            "size": SCROLL_BATCH_SIZE,
-            "sort": _course_id_sort(),
-            "track_total_hits": True,
-        }
-    )
+    return {
+        "query": _build_list_query(
+            st_dt, end_dt, organ_nm, process_nm, has_reg_course_man
+        ),
+        "size": SCROLL_BATCH_SIZE,
+        "sort": _course_id_sort(),
+        "track_total_hits": True,
+    }
 
 
 async def _load_active_owned_names(session: AsyncSession) -> list[str]:
@@ -401,7 +364,7 @@ def _build_owned_match_body(
     }
     if min_score_value is not None:
         body["min_score"] = min_score_value
-    return _attach_search_runtime_mappings(body)
+    return body
 
 
 def _build_owned_scroll_body(
@@ -421,7 +384,7 @@ def _build_owned_scroll_body(
     }
     if min_score_value is not None:
         body["min_score"] = min_score_value
-    return _attach_search_runtime_mappings(body)
+    return body
 
 
 def _course_list_from_es_response(
