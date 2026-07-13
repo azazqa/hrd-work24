@@ -69,6 +69,90 @@ export type BodyOwnedCoursesImportOwnedCourses = {
 };
 
 /**
+ * CourseExportJobCreate
+ */
+export type CourseExportJobCreate = {
+  /**
+   * Memo
+   */
+  memo?: string | null;
+  /**
+   * Srch Tra St Dt
+   */
+  srch_tra_st_dt?: string | null;
+  /**
+   * Srch Tra End Dt
+   */
+  srch_tra_end_dt?: string | null;
+  /**
+   * Srch Tra Organ Nm
+   */
+  srch_tra_organ_nm?: string | null;
+  /**
+   * Srch Tra Process Nm
+   */
+  srch_tra_process_nm?: string | null;
+  /**
+   * Has Reg Course Man
+   */
+  has_reg_course_man?: boolean;
+  /**
+   * Owned Year
+   */
+  owned_year?: number | null;
+  /**
+   * Min Score
+   */
+  min_score?: number;
+};
+
+/**
+ * CourseExportJobRead
+ */
+export type CourseExportJobRead = {
+  /**
+   * Id
+   */
+  id: number;
+  /**
+   * Status
+   */
+  status: string;
+  /**
+   * Memo
+   */
+  memo: string | null;
+  /**
+   * Conditions Summary
+   */
+  conditions_summary: string | null;
+  /**
+   * Row Count
+   */
+  row_count: number | null;
+  /**
+   * File Name
+   */
+  file_name: string | null;
+  /**
+   * File Size
+   */
+  file_size: number | null;
+  /**
+   * Error Message
+   */
+  error_message: string | null;
+  /**
+   * Created At
+   */
+  created_at: string;
+  /**
+   * Updated At
+   */
+  updated_at: string;
+};
+
+/**
  * CourseIndexResult
  */
 export type CourseIndexResult = {
@@ -523,6 +607,32 @@ export type OwnedCourseUpdate = {
    * Is Active
    */
   is_active?: boolean | null;
+};
+
+/**
+ * Page[CourseExportJobRead]
+ */
+export type PageCourseExportJobRead = {
+  /**
+   * Items
+   */
+  items: Array<CourseExportJobRead>;
+  /**
+   * Total
+   */
+  total?: number | null;
+  /**
+   * Page
+   */
+  page: number | null;
+  /**
+   * Size
+   */
+  size: number | null;
+  /**
+   * Pages
+   */
+  pages?: number | null;
 };
 
 /**
@@ -1840,6 +1950,100 @@ export type ExportCoursesErrors = {
 export type ExportCoursesError = ExportCoursesErrors[keyof ExportCoursesErrors];
 
 export type ExportCoursesResponses = {
+  /**
+   * Successful Response
+   */
+  200: unknown;
+};
+
+export type ListCourseExportJobsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Page
+     * Page number
+     */
+    page?: number;
+    /**
+     * Size
+     * Page size
+     */
+    size?: number;
+  };
+  url: "/courses/export-jobs";
+};
+
+export type ListCourseExportJobsErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type ListCourseExportJobsError =
+  ListCourseExportJobsErrors[keyof ListCourseExportJobsErrors];
+
+export type ListCourseExportJobsResponses = {
+  /**
+   * Successful Response
+   */
+  200: PageCourseExportJobRead;
+};
+
+export type ListCourseExportJobsResponse =
+  ListCourseExportJobsResponses[keyof ListCourseExportJobsResponses];
+
+export type CreateCourseExportJobData = {
+  body: CourseExportJobCreate;
+  path?: never;
+  query?: never;
+  url: "/courses/export-jobs";
+};
+
+export type CreateCourseExportJobErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type CreateCourseExportJobError =
+  CreateCourseExportJobErrors[keyof CreateCourseExportJobErrors];
+
+export type CreateCourseExportJobResponses = {
+  /**
+   * Successful Response
+   */
+  201: CourseExportJobRead;
+};
+
+export type CreateCourseExportJobResponse =
+  CreateCourseExportJobResponses[keyof CreateCourseExportJobResponses];
+
+export type DownloadCourseExportJobData = {
+  body?: never;
+  path: {
+    /**
+     * Export Id
+     */
+    export_id: number;
+  };
+  query?: never;
+  url: "/courses/export-jobs/{export_id}/download";
+};
+
+export type DownloadCourseExportJobErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError;
+};
+
+export type DownloadCourseExportJobError =
+  DownloadCourseExportJobErrors[keyof DownloadCourseExportJobErrors];
+
+export type DownloadCourseExportJobResponses = {
   /**
    * Successful Response
    */

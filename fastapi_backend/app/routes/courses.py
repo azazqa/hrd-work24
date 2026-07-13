@@ -11,6 +11,7 @@ from datetime import datetime
 from elasticsearch import NotFoundError
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from fastapi_pagination.ext.sqlalchemy import apaginate
 from openpyxl import Workbook
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
@@ -19,7 +20,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import get_async_session
 from app.es import get_es
-from app.models import OwnedCourse, SchedulerJob, SchedulerJobQueue, User
+from app.models import (
+    CourseExportJob,
+    OwnedCourse,
+    SchedulerJob,
+    SchedulerJobQueue,
+    User,
+)
+from app.pagination import MAX_PAGE_SIZE, Page, Params
 from app.users import current_active_user, current_superuser
 from app.work24 import (
     INDEX_TEST_PARAMS,
@@ -40,6 +48,9 @@ _WILDCARD_ESCAPE_RE = re.compile(r"([\\*?])")
 MAX_EXPORT_ROWS = 100_000
 SCROLL_BATCH_SIZE = 1_000
 SCROLL_KEEPALIVE = "2m"
+EXPORT_MEDIA_TYPE = (
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
 EXPORT_OVER_LIMIT_MESSAGE = (
     "조회 결과가 100,000건을 초과합니다. 검색 조건을 좁혀 주세요."
 )
@@ -87,6 +98,32 @@ class LegacyIndexResponse(BaseModel):
     end_month: str
     month_count: int
     message: str
+
+
+class CourseExportJobCreate(BaseModel):
+    memo: str | None = Field(default=None, max_length=1000)
+    srch_tra_st_dt: str | None = None
+    srch_tra_end_dt: str | None = None
+    srch_tra_organ_nm: str | None = None
+    srch_tra_process_nm: str | None = None
+    has_reg_course_man: bool = False
+    owned_year: int | None = Field(default=None, ge=2023, le=2100)
+    min_score: float = Field(default=0, ge=0)
+
+
+class CourseExportJobRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    status: str
+    memo: str | None
+    conditions_summary: str | None
+    row_count: int | None
+    file_name: str | None
+    file_size: int | None
+    error_message: str | None
+    created_at: datetime
+    updated_at: datetime
 
 
 QUEUE_ACTION_RUN_NOW = "RUN_NOW"
@@ -429,7 +466,7 @@ async def _clear_scroll_safe(es, scroll_id: str | None) -> None:
         logger.exception("Elasticsearch clear_scroll failed")
 
 
-async def _write_courses_xlsx(es, body: dict, path: str) -> None:
+async def _write_courses_xlsx(es, body: dict, path: str) -> int:
     wb = Workbook(write_only=True)
     ws = wb.create_sheet("과정목록")
     ws.append([label for label, _ in EXPORT_HEADERS])
@@ -462,16 +499,18 @@ async def _write_courses_xlsx(es, body: dict, path: str) -> None:
         await _clear_scroll_safe(es, scroll_id)
 
     await asyncio.to_thread(wb.save, path)
+    return written
 
 
-async def _write_empty_courses_xlsx(path: str) -> None:
+async def _write_empty_courses_xlsx(path: str) -> int:
     wb = Workbook(write_only=True)
     ws = wb.create_sheet("과정목록")
     ws.append([label for label, _ in EXPORT_HEADERS])
     await asyncio.to_thread(wb.save, path)
+    return 0
 
 
-async def _stream_file_chunks(path: str) -> AsyncIterator[bytes]:
+async def _stream_file_chunks(path: str, *, unlink_after: bool = True) -> AsyncIterator[bytes]:
     try:
         with open(path, "rb") as file_obj:
             while True:
@@ -480,10 +519,11 @@ async def _stream_file_chunks(path: str) -> AsyncIterator[bytes]:
                     break
                 yield chunk
     finally:
-        try:
-            await asyncio.to_thread(os.unlink, path)
-        except OSError:
-            logger.exception("Failed to remove temporary export file %s", path)
+        if unlink_after:
+            try:
+                await asyncio.to_thread(os.unlink, path)
+            except OSError:
+                logger.exception("Failed to remove temporary export file %s", path)
 
 
 async def _export_courses_response(es, body: dict | None) -> StreamingResponse:
@@ -507,8 +547,87 @@ async def _export_courses_response(es, body: dict | None) -> StreamingResponse:
     filename = f"courses_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     return StreamingResponse(
         _stream_file_chunks(path),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        media_type=EXPORT_MEDIA_TYPE,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _normalize_export_params(
+    *,
+    srch_tra_st_dt: str | None,
+    srch_tra_end_dt: str | None,
+    srch_tra_organ_nm: str | None,
+    srch_tra_process_nm: str | None,
+    has_reg_course_man: bool,
+    owned_year: int | None,
+    min_score: float,
+) -> dict:
+    """요청 파라미터를 검증하고 course_export_job.params 저장용 dict로 정규화한다."""
+    if owned_year is not None:
+        return {
+            "owned_year": int(owned_year),
+            "min_score": float(min_score or 0),
+            "has_reg_course_man": bool(has_reg_course_man),
+        }
+    if not srch_tra_st_dt or not srch_tra_end_dt:
+        raise HTTPException(
+            status_code=400,
+            detail="srch_tra_st_dt and srch_tra_end_dt are required",
+        )
+    st_dt = _normalize_work24_date(srch_tra_st_dt, "srch_tra_st_dt")
+    end_dt = _normalize_work24_date(srch_tra_end_dt, "srch_tra_end_dt")
+    params: dict = {
+        "srch_tra_st_dt": st_dt,
+        "srch_tra_end_dt": end_dt,
+        "has_reg_course_man": bool(has_reg_course_man),
+    }
+    organ_nm = srch_tra_organ_nm.strip() if srch_tra_organ_nm else None
+    process_nm = srch_tra_process_nm.strip() if srch_tra_process_nm else None
+    if organ_nm:
+        params["srch_tra_organ_nm"] = organ_nm
+    if process_nm:
+        params["srch_tra_process_nm"] = process_nm
+    return params
+
+
+def _build_conditions_summary(params: dict) -> str:
+    """저장된 params를 사람이 읽을 수 있는 검색조건 요약으로 변환한다."""
+    parts: list[str] = []
+    if params.get("owned_year") is not None:
+        parts.append(f"보유과정 {params['owned_year']}년")
+        min_score = params.get("min_score")
+        if min_score:
+            parts.append(f"관련도≥{min_score}")
+    else:
+        st = _to_es_date(str(params.get("srch_tra_st_dt", "")))
+        end = _to_es_date(str(params.get("srch_tra_end_dt", "")))
+        parts.append(f"훈련시작일 {st} ~ {end}")
+        if params.get("srch_tra_organ_nm"):
+            parts.append(f"기관명 '{params['srch_tra_organ_nm']}'")
+        if params.get("srch_tra_process_nm"):
+            parts.append(f"과정명 '{params['srch_tra_process_nm']}'")
+    if params.get("has_reg_course_man"):
+        parts.append("수강신청 인원 있음")
+    return ", ".join(parts)
+
+
+def _export_body_from_params(params: dict, names: list[str] | None) -> dict | None:
+    """저장된 params로 스크롤 ES body를 재구성한다. owned 모드는 names가 필요하다."""
+    if params.get("owned_year") is not None:
+        if not names:
+            return None
+        return _build_owned_scroll_body(
+            names,
+            int(params["owned_year"]),
+            float(params.get("min_score") or 0),
+            bool(params.get("has_reg_course_man")),
+        )
+    return _build_list_scroll_body(
+        str(params["srch_tra_st_dt"]),
+        str(params["srch_tra_end_dt"]),
+        params.get("srch_tra_organ_nm"),
+        params.get("srch_tra_process_nm"),
+        bool(params.get("has_reg_course_man")),
     )
 
 
@@ -682,6 +801,98 @@ async def export_courses(
     except Exception:
         logger.exception("Course export failed")
         raise HTTPException(status_code=502, detail="Course export failed") from None
+
+
+@router.post("/export-jobs", response_model=CourseExportJobRead, status_code=201)
+async def create_course_export_job(
+    body: CourseExportJobCreate,
+    session: AsyncSession = Depends(get_async_session),
+    user: User = Depends(current_active_user),
+) -> CourseExportJobRead:
+    params = _normalize_export_params(
+        srch_tra_st_dt=body.srch_tra_st_dt,
+        srch_tra_end_dt=body.srch_tra_end_dt,
+        srch_tra_organ_nm=body.srch_tra_organ_nm,
+        srch_tra_process_nm=body.srch_tra_process_nm,
+        has_reg_course_man=body.has_reg_course_man,
+        owned_year=body.owned_year,
+        min_score=body.min_score,
+    )
+
+    job_def = await session.get(SchedulerJob, "course_export")
+    if job_def is None or job_def.is_delete:
+        raise HTTPException(status_code=404, detail="course_export job not found")
+
+    memo = body.memo.strip() if body.memo else None
+    export = CourseExportJob(
+        status=QUEUE_STATUS_PENDING,
+        memo=memo,
+        conditions_summary=_build_conditions_summary(params),
+        params=params,
+        requested_by_user_id=user.id,
+    )
+    session.add(export)
+    await session.commit()
+    await session.refresh(export)
+
+    q = SchedulerJobQueue(
+        job_key="course_export",
+        action=QUEUE_ACTION_RUN_NOW,
+        status=QUEUE_STATUS_PENDING,
+        requested_by_user_id=user.id,
+        payload={"export_id": export.id},
+    )
+    session.add(q)
+    await session.commit()
+    await session.refresh(q)
+
+    export.queue_id = q.id
+    await session.commit()
+    await session.refresh(export)
+    return export
+
+
+@router.get("/export-jobs", response_model=Page[CourseExportJobRead])
+async def list_course_export_jobs(
+    page: int = 1,
+    size: int = 20,
+    session: AsyncSession = Depends(get_async_session),
+    user: User = Depends(current_active_user),
+):
+    if size < 1:
+        raise HTTPException(status_code=400, detail="size must be >= 1")
+    if size > MAX_PAGE_SIZE:
+        raise HTTPException(status_code=400, detail=f"size must be <= {MAX_PAGE_SIZE}")
+    params = Params(page=page, size=size)
+    stmt = select(CourseExportJob).where(CourseExportJob.is_delete == False)  # noqa: E712
+    if not user.is_superuser:
+        stmt = stmt.where(CourseExportJob.requested_by_user_id == user.id)
+    stmt = stmt.order_by(CourseExportJob.id.desc())
+    return await apaginate(session, stmt, params)
+
+
+@router.get("/export-jobs/{export_id}/download")
+async def download_course_export_job(
+    export_id: int,
+    session: AsyncSession = Depends(get_async_session),
+    user: User = Depends(current_active_user),
+) -> StreamingResponse:
+    job = await session.get(CourseExportJob, export_id)
+    if job is None or job.is_delete:
+        raise HTTPException(status_code=404, detail="Export job not found")
+    if not user.is_superuser and job.requested_by_user_id != user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if job.status != "SUCCEEDED" or not job.file_path:
+        raise HTTPException(status_code=404, detail="Export file not ready")
+    if not os.path.exists(job.file_path):
+        raise HTTPException(status_code=404, detail="Export file missing")
+
+    filename = job.file_name or f"courses_{export_id}.xlsx"
+    return StreamingResponse(
+        _stream_file_chunks(job.file_path, unlink_after=False),
+        media_type=EXPORT_MEDIA_TYPE,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/search", response_model=list[CourseSearchHit])

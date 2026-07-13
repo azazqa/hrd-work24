@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     ELASTICSEARCH_URL: str = "http://elasticsearch:9200"
     ES_COURSE_INDEX: str = "trng_courses"
 
+    # 과정 내보내기 (비동기 작업 결과 파일 저장 경로; backend·scheduler 공유 볼륨)
+    EXPORT_DIR: str = "shared-data/exports"
+
     # Work24 Open API
     WORK24_API_KEY: str
     WORK24_URL: str

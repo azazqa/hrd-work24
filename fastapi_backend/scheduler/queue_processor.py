@@ -8,12 +8,15 @@ from sqlalchemy.orm import Session
 
 from app.models import SchedulerJobQueue
 from scheduler.db import build_scheduler_engine
+from scheduler.jobs.course_export import run_course_export
 from scheduler.jobs.course_index_refresh import refresh_course_index
 from scheduler.jobs.legacy_course_index import run_legacy_course_index
 
 logger = logging.getLogger(__name__)
 
-KNOWN_JOB_KEYS = frozenset({"course_index_refresh", "legacy_course_index"})
+KNOWN_JOB_KEYS = frozenset(
+    {"course_index_refresh", "legacy_course_index", "course_export"}
+)
 
 _PROCESSING_JOB_KEYS = (
     select(SchedulerJobQueue.job_key)
@@ -42,6 +45,14 @@ def _run_job(job_key: str, *, engine, payload: dict | None = None) -> tuple[str,
     if job_key == "legacy_course_index":
         pl = dict(payload or {})
         result = run_legacy_course_index(engine=engine, payload=pl)
+        if result is None:
+            return "lock_skipped", None
+        if result.status == "SUCCESS":
+            return "succeeded", None
+        return "failed", result.error_message or "job failed"
+    if job_key == "course_export":
+        pl = dict(payload or {})
+        result = run_course_export(engine=engine, payload=pl)
         if result is None:
             return "lock_skipped", None
         if result.status == "SUCCESS":

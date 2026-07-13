@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download } from "lucide-react";
-import { toast } from "sonner";
+import { Download, ListChecks } from "lucide-react";
 
 import type { CourseListItem } from "@/app/openapi-client";
 import { Button } from "@/components/ui/button";
@@ -17,38 +16,19 @@ import {
 } from "@/components/ui/table";
 
 import { CourseDetailDialog } from "./course-detail-dialog";
+import { ExportCreateDialog } from "./export-create-dialog";
+import { ExportListDialog } from "./export-list-dialog";
 
 type Props = {
   items: CourseListItem[];
   exportQuery: string;
 };
 
-async function readApiError(res: Response): Promise<string> {
-  const text = await res.text().catch(() => "");
-  try {
-    const j = JSON.parse(text) as { detail?: string | { msg?: string }[] };
-    if (typeof j.detail === "string") return j.detail;
-    if (Array.isArray(j.detail)) {
-      return j.detail
-        .map((d) => (typeof d === "object" && d?.msg ? d.msg : String(d)))
-        .join(", ");
-    }
-  } catch {
-    /* ignore */
-  }
-  return text || `요청 실패 (HTTP ${res.status})`;
-}
-
-function parseFilename(contentDisposition: string | null): string {
-  if (!contentDisposition) return "courses_export.xlsx";
-  const match = /filename="([^"]+)"/i.exec(contentDisposition);
-  return match?.[1] ?? "courses_export.xlsx";
-}
-
 export function CoursesList({ items, exportQuery }: Props) {
   const [selected, setSelected] = useState<CourseListItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
 
   const openDetail = (row: CourseListItem) => {
     setSelected(row);
@@ -60,43 +40,30 @@ export function CoursesList({ items, exportQuery }: Props) {
     if (!open) setSelected(null);
   };
 
-  const handleExport = async () => {
-    setExporting(true);
-    try {
-      const res = await fetch(`/api/courses/export?${exportQuery}`);
-      if (!res.ok) {
-        toast.error(await readApiError(res));
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = parseFilename(res.headers.get("content-disposition"));
-      link.click();
-      URL.revokeObjectURL(url);
-      toast.success("과정 목록을 내보냈습니다.");
-    } catch {
-      toast.error("내보내기에 실패했습니다.");
-    } finally {
-      setExporting(false);
-    }
-  };
-
   return (
     <>
       <div className="mb-4 flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-xl font-semibold">과정 목록</h2>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={exporting}
-          onClick={handleExport}
-        >
-          <Download className="mr-2 h-4 w-4" />
-          {exporting ? "내보내기 중…" : "과정 내보내기"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setCreateOpen(true)}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            과정 내보내기
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setListOpen(true)}
+          >
+            <ListChecks className="mr-2 h-4 w-4" />
+            과정 다운로드 목록
+          </Button>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
@@ -155,6 +122,15 @@ export function CoursesList({ items, exportQuery }: Props) {
         open={dialogOpen}
         onOpenChange={handleDialogOpenChange}
       />
+
+      <ExportCreateDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        exportQuery={exportQuery}
+        onCreated={() => setListOpen(true)}
+      />
+
+      <ExportListDialog open={listOpen} onOpenChange={setListOpen} />
     </>
   );
 }

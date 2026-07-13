@@ -23,7 +23,9 @@ QUEUE_STATUS_PENDING = "PENDING"
 QUEUE_STATUS_PROCESSING = "PROCESSING"
 QUEUE_STATUS_CANCELLED = "CANCELLED"
 
-REGISTERED_JOB_KEYS = frozenset({"course_index_refresh", "legacy_course_index"})
+REGISTERED_JOB_KEYS = frozenset(
+    {"course_index_refresh", "legacy_course_index", "course_export"}
+)
 
 
 class SchedulerJobRead(BaseModel):

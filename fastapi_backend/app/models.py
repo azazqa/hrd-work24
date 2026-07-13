@@ -123,6 +123,33 @@ class OwnedCourse(Base):
     )
 
 
+class CourseExportJob(Base):
+    """과정 내보내기 비동기 작업 (파일 생성 요청·상태·결과)."""
+
+    __tablename__ = "course_export_job"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    status = Column(
+        String(20), nullable=False, default="PENDING", server_default="PENDING"
+    )
+    memo = Column(Text, nullable=True)
+    conditions_summary = Column(Text, nullable=True)
+    params = Column(JSONB, nullable=True)
+    row_count = Column(Integer, nullable=True)
+    file_path = Column(Text, nullable=True)
+    file_name = Column(String(255), nullable=True)
+    file_size = Column(BigInteger, nullable=True)
+    error_message = Column(Text, nullable=True)
+    queue_id = Column(BigInteger, nullable=True)
+    requested_by_user_id = Column(
+        UUID(as_uuid=True), ForeignKey("user.id"), nullable=True, index=True
+    )
+
+    __table_args__ = (
+        Index("ix_course_export_job_status_created", "status", "created_at"),
+    )
+
+
 class Work24ApiLog(Base):
     """Work24 Open API 호출 이력 (headers only)."""
 

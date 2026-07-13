@@ -81,6 +81,15 @@ import type {
   ExportCoursesData,
   ExportCoursesResponses,
   ExportCoursesErrors,
+  ListCourseExportJobsData,
+  ListCourseExportJobsResponses,
+  ListCourseExportJobsErrors,
+  CreateCourseExportJobData,
+  CreateCourseExportJobResponses,
+  CreateCourseExportJobErrors,
+  DownloadCourseExportJobData,
+  DownloadCourseExportJobResponses,
+  DownloadCourseExportJobErrors,
   SearchCoursesData,
   SearchCoursesResponses,
   SearchCoursesErrors,
@@ -707,6 +716,79 @@ export const exportCourses = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/courses/export",
+    ...options,
+  });
+};
+
+/**
+ * List Course Export Jobs
+ */
+export const listCourseExportJobs = <ThrowOnError extends boolean = false>(
+  options?: Options<ListCourseExportJobsData, ThrowOnError>,
+) => {
+  return (options?.client ?? client).get<
+    ListCourseExportJobsResponses,
+    ListCourseExportJobsErrors,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/courses/export-jobs",
+    ...options,
+  });
+};
+
+/**
+ * Create Course Export Job
+ */
+export const createCourseExportJob = <ThrowOnError extends boolean = false>(
+  options: Options<CreateCourseExportJobData, ThrowOnError>,
+) => {
+  return (options.client ?? client).post<
+    CreateCourseExportJobResponses,
+    CreateCourseExportJobErrors,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/courses/export-jobs",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+};
+
+/**
+ * Download Course Export Job
+ */
+export const downloadCourseExportJob = <ThrowOnError extends boolean = false>(
+  options: Options<DownloadCourseExportJobData, ThrowOnError>,
+) => {
+  return (options.client ?? client).get<
+    DownloadCourseExportJobResponses,
+    DownloadCourseExportJobErrors,
+    ThrowOnError
+  >({
+    responseType: "json",
+    security: [
+      {
+        scheme: "bearer",
+        type: "http",
+      },
+    ],
+    url: "/courses/export-jobs/{export_id}/download",
     ...options,
   });
 };
