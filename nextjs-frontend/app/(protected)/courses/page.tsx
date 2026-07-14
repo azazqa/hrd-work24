@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+
 import {
   fetchCourses,
   fetchOwnedMatchedCourses,
@@ -9,6 +11,59 @@ import { redirect } from "next/navigation";
 
 import { CourseSearchForm } from "./course-search-form";
 import { CoursesList } from "./courses-list";
+import { CoursesTableSkeleton } from "./courses-table-skeleton";
+
+const SKELETON_ROWS = 10;
+
+type CoursesResultProps = {
+  page: number;
+  size: number;
+  exportQuery: string;
+  extraQuery: string;
+} & (
+  | { mode: "normal"; search: CourseListSearch }
+  | {
+      mode: "owned";
+      ownedYear: number;
+      minScore: number;
+      hasRegCourseMan: boolean;
+    }
+);
+
+async function CoursesResult(props: CoursesResultProps) {
+  const { page, size, exportQuery, extraQuery } = props;
+  const courses =
+    props.mode === "owned"
+      ? await fetchOwnedMatchedCourses(
+          props.ownedYear,
+          page,
+          size,
+          props.minScore,
+          props.hasRegCourseMan,
+        )
+      : await fetchCourses(page, size, props.search);
+  const totalPages =
+    "message" in courses ? 0 : Math.ceil(courses.total_count / size);
+
+  return (
+    <>
+      {"message" in courses ? (
+        <p className="text-sm text-destructive">{courses.message}</p>
+      ) : (
+        <CoursesList items={courses.items ?? []} exportQuery={exportQuery} />
+      )}
+
+      <PagePagination
+        currentPage={page}
+        totalPages={Math.max(1, totalPages)}
+        pageSize={size}
+        totalItems={"message" in courses ? 0 : courses.total_count}
+        basePath="/courses"
+        extraQuery={extraQuery}
+      />
+    </>
+  );
+}
 
 interface CoursesPageProps {
   searchParams: Promise<{
@@ -76,15 +131,7 @@ export default async function CoursesPage({ searchParams }: CoursesPageProps) {
   if (isOwnedSearch) {
     const extraQuery = buildCourseSearchQuery(params);
     const exportQuery = extraQuery;
-    const courses = await fetchOwnedMatchedCourses(
-      ownedYear!,
-      page,
-      size,
-      minScore,
-      hasRegCourseMan,
-    );
-    const totalPages =
-      "message" in courses ? 0 : Math.ceil(courses.total_count / size);
+    const suspenseKey = `owned:${ownedYear}:${page}:${size}:${minScore}:${hasRegCourseMan}`;
 
     return (
       <div>
@@ -113,20 +160,21 @@ export default async function CoursesPage({ searchParams }: CoursesPageProps) {
         </section>
 
         <section className="mt-8 rounded-lg bg-white p-6 shadow-lg dark:bg-gray-900">
-          {"message" in courses ? (
-            <p className="text-sm text-destructive">{courses.message}</p>
-          ) : (
-            <CoursesList items={courses.items ?? []} exportQuery={exportQuery} />
-          )}
-
-          <PagePagination
-            currentPage={page}
-            totalPages={Math.max(1, totalPages)}
-            pageSize={size}
-            totalItems={"message" in courses ? 0 : courses.total_count}
-            basePath="/courses"
-            extraQuery={extraQuery}
-          />
+          <Suspense
+            key={suspenseKey}
+            fallback={<CoursesTableSkeleton rows={SKELETON_ROWS} />}
+          >
+            <CoursesResult
+              mode="owned"
+              ownedYear={ownedYear!}
+              minScore={minScore}
+              hasRegCourseMan={hasRegCourseMan}
+              page={page}
+              size={size}
+              exportQuery={exportQuery}
+              extraQuery={extraQuery}
+            />
+          </Suspense>
         </section>
       </div>
     );
@@ -161,10 +209,7 @@ export default async function CoursesPage({ searchParams }: CoursesPageProps) {
   const extraQuery = buildCourseSearchQuery(params);
   const exportQuery = extraQuery;
   const search = searchFromParams(params);
-
-  const courses = await fetchCourses(page, size, search);
-  const totalPages =
-    "message" in courses ? 0 : Math.ceil(courses.total_count / size);
+  const suspenseKey = `normal:${page}:${size}:${JSON.stringify(search)}`;
 
   return (
     <div>
@@ -188,20 +233,19 @@ export default async function CoursesPage({ searchParams }: CoursesPageProps) {
       </section>
 
       <section className="mt-8 rounded-lg bg-white p-6 shadow-lg dark:bg-gray-900">
-        {"message" in courses ? (
-          <p className="text-sm text-destructive">{courses.message}</p>
-        ) : (
-          <CoursesList items={courses.items ?? []} exportQuery={exportQuery} />
-        )}
-
-        <PagePagination
-          currentPage={page}
-          totalPages={Math.max(1, totalPages)}
-          pageSize={size}
-          totalItems={"message" in courses ? 0 : courses.total_count}
-          basePath="/courses"
-          extraQuery={extraQuery}
-        />
+        <Suspense
+          key={suspenseKey}
+          fallback={<CoursesTableSkeleton rows={SKELETON_ROWS} />}
+        >
+          <CoursesResult
+            mode="normal"
+            search={search}
+            page={page}
+            size={size}
+            exportQuery={exportQuery}
+            extraQuery={extraQuery}
+          />
+        </Suspense>
       </section>
     </div>
   );
