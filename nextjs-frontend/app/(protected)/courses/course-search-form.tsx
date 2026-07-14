@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { ChevronDownIcon } from "lucide-react";
 import { format, parse, subMonths } from "date-fns";
 
@@ -73,21 +72,21 @@ export function CourseSearchForm({
     min_score: number;
   };
 }) {
-  const router = useRouter();
   const [openTraDatePicker, setOpenTraDatePicker] = useState<"start" | "end" | null>(
     null,
   );
   const [ownedSearchOpen, setOwnedSearchOpen] = useState(false);
 
-  const { form, setForm, handleSubmit, handleReset } = useSearchFormSync({
-    basePath: "/courses",
-    size,
-    initial,
-    fromInitial,
-    buildQueryString: buildSearchQueryString,
-    buildResetQueryString: buildDefaultResetQuery,
-    resetForm: () => fromInitial({}),
-  });
+  const { form, setForm, handleSubmit, handleReset, isPending, navigate } =
+    useSearchFormSync({
+      basePath: "/courses",
+      size,
+      initial,
+      fromInitial,
+      buildQueryString: buildSearchQueryString,
+      buildResetQueryString: buildDefaultResetQuery,
+      resetForm: () => fromInitial({}),
+    });
 
   const traCalendarBounds = useMemo(() => getTraStartCalendarBounds(), []);
 
@@ -136,7 +135,7 @@ export function CourseSearchForm({
       if (checked) q.set("has_reg_course_man", "true");
       q.set("page", "1");
       q.set("size", String(size));
-      router.push(`/courses?${q.toString()}`);
+      navigate(`/courses?${q.toString()}`);
     }
   };
 
@@ -304,15 +303,23 @@ export function CourseSearchForm({
           </Field>
         </FieldGroup>
         <div className="mt-4 flex gap-2">
-          <Button type="submit">조회</Button>
+          <Button type="submit" disabled={isPending}>
+            조회
+          </Button>
           <Button
             type="button"
             variant="secondary"
             onClick={() => setOwnedSearchOpen(true)}
+            disabled={isPending}
           >
             보유 과정 조회
           </Button>
-          <Button type="button" variant="outline" onClick={handleResetClick}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleResetClick}
+            disabled={isPending}
+          >
             초기화
           </Button>
         </div>
@@ -322,6 +329,7 @@ export function CourseSearchForm({
         onOpenChange={setOwnedSearchOpen}
         pageSize={size}
         hasRegCourseMan={form.has_reg_course_man}
+        onNavigate={navigate}
       />
     </form>
   );

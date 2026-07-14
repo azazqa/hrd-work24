@@ -27,6 +27,7 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   pageSize: number;
   hasRegCourseMan?: boolean;
+  onNavigate?: (url: string) => void;
 };
 
 const DEFAULT_MIN_SCORE = "1";
@@ -36,6 +37,7 @@ export function OwnedSearchDialog({
   onOpenChange,
   pageSize,
   hasRegCourseMan = false,
+  onNavigate,
 }: Props) {
   const router = useRouter();
   const yearOptions = getTraYearOptions();
@@ -53,7 +55,12 @@ export function OwnedSearchDialog({
     q.set("size", String(pageSize));
     if (hasRegCourseMan) q.set("has_reg_course_man", "true");
     onOpenChange(false);
-    router.push(`/courses?${q.toString()}`);
+    const url = `/courses?${q.toString()}`;
+    if (onNavigate) {
+      onNavigate(url);
+    } else {
+      router.push(url);
+    }
   };
 
   const handleOpenChange = (next: boolean) => {

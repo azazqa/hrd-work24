@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 type SearchFieldValue = string | string[] | boolean | undefined | null;
@@ -51,15 +51,22 @@ export function useSearchFormSync<TForm, TInitial>({
   const router = useRouter();
   const snapshot = JSON.stringify(initial);
   const [form, setForm] = useState<TForm>(() => fromInitial(initial));
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     setForm(fromInitial(initial));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snapshot]);
 
+  const navigate = (url: string) => {
+    startTransition(() => {
+      router.push(url);
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    router.push(`${basePath}?${buildQueryString(form, size)}`);
+    navigate(`${basePath}?${buildQueryString(form, size)}`);
   };
 
   const handleReset = () => {
@@ -67,8 +74,8 @@ export function useSearchFormSync<TForm, TInitial>({
     const qs = buildResetQueryString
       ? buildResetQueryString(size)
       : `page=1&size=${size}`;
-    router.push(`${basePath}?${qs}`);
+    navigate(`${basePath}?${qs}`);
   };
 
-  return { form, setForm, handleSubmit, handleReset };
+  return { form, setForm, handleSubmit, handleReset, isPending, navigate };
 }
