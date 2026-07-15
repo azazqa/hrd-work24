@@ -52,7 +52,10 @@ async def _run_export(export_id: int) -> dict[str, Any]:
     body = _export_body_from_params(params, names)
     path = _export_path(export_id)
 
-    es = AsyncElasticsearch(hosts=[settings.ELASTICSEARCH_URL])
+    es = AsyncElasticsearch(
+        hosts=[settings.ELASTICSEARCH_URL],
+        request_timeout=settings.ES_REQUEST_TIMEOUT,
+    )
     try:
         try:
             if body is None:

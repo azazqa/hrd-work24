@@ -734,6 +734,14 @@ async def search_owned_courses(
     body = _build_owned_match_body(
         names, year, page_num, page_size, min_score, has_reg_course_man
     )
+    logger.info(
+        "owned-search year=%s names=%d page=%d size=%d min_score=%s",
+        year,
+        len(names),
+        page_num,
+        page_size,
+        min_score,
+    )
     try:
         response = await es.search(index=settings.ES_COURSE_INDEX, body=body)
     except NotFoundError:
@@ -744,7 +752,11 @@ async def search_owned_courses(
             page_size=page_size,
         )
     except Exception:
-        logger.exception("Elasticsearch owned-search failed for year=%s", year)
+        logger.exception(
+            "Elasticsearch owned-search failed for year=%s names=%d",
+            year,
+            len(names),
+        )
         raise HTTPException(status_code=502, detail="Owned course search failed") from None
 
     return _course_list_from_es_response(response, page_num, page_size)

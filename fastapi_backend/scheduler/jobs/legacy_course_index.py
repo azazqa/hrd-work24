@@ -33,7 +33,10 @@ async def _run_legacy_index(payload: dict[str, Any]) -> dict[str, Any]:
     st, en = month_ranges[0]
     month_label = month
 
-    es = AsyncElasticsearch(hosts=[settings.ELASTICSEARCH_URL])
+    es = AsyncElasticsearch(
+        hosts=[settings.ELASTICSEARCH_URL],
+        request_timeout=settings.ES_REQUEST_TIMEOUT,
+    )
     try:
         await ensure_course_index(es)
 

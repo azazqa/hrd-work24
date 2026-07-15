@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     # Elasticsearch
     ELASTICSEARCH_URL: str = "http://elasticsearch:9200"
     ES_COURSE_INDEX: str = "trng_courses"
+    # 보유과정 조회(와일드카드×N) 등 무거운 검색용. elasticsearch-py 기본은 10초.
+    ES_REQUEST_TIMEOUT: int = 60
 
     # 과정 내보내기 (비동기 작업 결과 파일 저장 경로; backend·scheduler 공유 볼륨)
     EXPORT_DIR: str = "shared-data/exports"
