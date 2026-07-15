@@ -114,7 +114,7 @@ export function ExportListDialog({ open, onOpenChange }: Props) {
       const nextTotal = data.total ?? nextItems.length;
       const nextPages = Math.max(
         1,
-        data.pages ?? Math.ceil(nextTotal / pageSize) || 1,
+        data.pages ?? (Math.ceil(nextTotal / pageSize) || 1),
       );
       // 마지막 페이지를 넘어간 경우(삭제·완료 후 건수 감소) 보정
       if (pageNum > nextPages) {
