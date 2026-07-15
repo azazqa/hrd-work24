@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatNumberWithCommas } from "@/lib/format-utils";
+import { PAGE_SIZE_OPTIONS } from "@/lib/pagination";
+import { buildPageWindow } from "@/components/pagination-window";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +18,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -22,6 +32,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+} from "@/components/ui/pagination";
 
 type Props = {
   open: boolean;
@@ -43,8 +59,14 @@ type ExportJob = {
 
 type ExportJobPage = {
   items: ExportJob[];
+  total?: number | null;
+  page?: number | null;
+  size?: number | null;
+  pages?: number | null;
 };
 
+const DEFAULT_PAGE_SIZE = 10;
+const DIALOG_PAGE_SIZES = PAGE_SIZE_OPTIONS.filter((n) => n <= 50);
 const ACTIVE_STATUSES = new Set(["PENDING", "PROCESSING"]);
 
 const STATUS_LABEL: Record<string, string> = {
@@ -71,19 +93,37 @@ function formatDateTime(iso: string): string {
 
 export function ExportListDialog({ open, onOpenChange }: Props) {
   const [items, setItems] = useState<ExportJob[]>([]);
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(DEFAULT_PAGE_SIZE);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (pageNum: number, pageSize: number) => {
     try {
-      const res = await fetch("/api/courses/export-jobs?page=1&size=50", {
-        cache: "no-store",
-      });
+      const res = await fetch(
+        `/api/courses/export-jobs?page=${pageNum}&size=${pageSize}`,
+        { cache: "no-store" },
+      );
       if (!res.ok) {
         toast.error("다운로드 목록을 불러오지 못했습니다.");
         return;
       }
       const data = (await res.json()) as ExportJobPage;
-      setItems(data.items ?? []);
+      const nextItems = data.items ?? [];
+      const nextTotal = data.total ?? nextItems.length;
+      const nextPages = Math.max(
+        1,
+        data.pages ?? Math.ceil(nextTotal / pageSize) || 1,
+      );
+      // 마지막 페이지를 넘어간 경우(삭제·완료 후 건수 감소) 보정
+      if (pageNum > nextPages) {
+        setPage(nextPages);
+        return;
+      }
+      setItems(nextItems);
+      setTotal(nextTotal);
+      setTotalPages(nextPages);
     } catch {
       toast.error("다운로드 목록을 불러오지 못했습니다.");
     }
@@ -91,19 +131,28 @@ export function ExportListDialog({ open, onOpenChange }: Props) {
 
   useEffect(() => {
     if (!open) return;
+    setPage(1);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
     setLoading(true);
-    void load().finally(() => setLoading(false));
-  }, [open, load]);
+    void load(page, size).finally(() => setLoading(false));
+  }, [open, page, size, load]);
 
   useEffect(() => {
     if (!open) return;
     const hasActive = items.some((it) => ACTIVE_STATUSES.has(it.status));
     if (!hasActive) return;
     const timer = setInterval(() => {
-      void load();
+      void load(page, size);
     }, 4000);
     return () => clearInterval(timer);
-  }, [open, items, load]);
+  }, [open, items, page, size, load]);
+
+  const pages = buildPageWindow(page, totalPages);
+  const hasPrevious = page > 1;
+  const hasNext = page < totalPages;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -177,6 +226,84 @@ export function ExportListDialog({ open, onOpenChange }: Props) {
             </TableBody>
           </Table>
         </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-sm text-muted-foreground">
+            {total === 0 ? "전체 0건" : `전체 ${formatNumberWithCommas(String(total))}건`}
+          </div>
+          <Pagination className="mx-0 w-auto justify-end">
+            <PaginationContent>
+              <PaginationItem>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className={cn("h-9 w-9", !hasPrevious && "pointer-events-none opacity-50")}
+                  disabled={!hasPrevious || loading}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  aria-label="이전 페이지"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+              </PaginationItem>
+              {pages.map((p, idx) =>
+                p === "ellipsis" ? (
+                  <PaginationItem key={`e-${idx}`}>
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                ) : (
+                  <PaginationItem key={p}>
+                    <Button
+                      type="button"
+                      variant={p === page ? "default" : "outline"}
+                      size="icon"
+                      className="h-9 w-9"
+                      disabled={loading}
+                      onClick={() => setPage(p)}
+                    >
+                      {p}
+                    </Button>
+                  </PaginationItem>
+                ),
+              )}
+              <PaginationItem>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className={cn("h-9 w-9", !hasNext && "pointer-events-none opacity-50")}
+                  disabled={!hasNext || loading}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  aria-label="다음 페이지"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">페이지당:</span>
+            <Select
+              value={String(size)}
+              onValueChange={(v) => {
+                setSize(Number(v));
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DIALOG_PAGE_SIZES.map((n) => (
+                  <SelectItem key={n} value={String(n)}>
+                    {n}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             닫기
