@@ -8,6 +8,8 @@ from app.models import CourseExportJob, SchedulerJob, SchedulerJobQueue
 from app.routes.courses import (
     _build_conditions_summary,
     _export_body_from_params,
+    _export_download_filename,
+    _export_year_label,
     _normalize_export_params,
 )
 
@@ -82,6 +84,38 @@ def test_build_conditions_summary_owned():
     )
     assert "보유과정 2025년" in summary
     assert "관련도≥2" in summary
+
+
+def test_export_year_label_owned():
+    assert _export_year_label({"owned_year": 2024}) == "2024"
+
+
+def test_export_year_label_same_year_range():
+    assert (
+        _export_year_label(
+            {"srch_tra_st_dt": "20250601", "srch_tra_end_dt": "20250630"}
+        )
+        == "2025"
+    )
+
+
+def test_export_year_label_cross_year_range():
+    assert (
+        _export_year_label(
+            {"srch_tra_st_dt": "20241201", "srch_tra_end_dt": "20250228"}
+        )
+        == "2024-2025"
+    )
+
+
+def test_export_download_filename_includes_year():
+    from datetime import datetime
+
+    name = _export_download_filename(
+        {"owned_year": 2024},
+        when=datetime(2026, 7, 15, 11, 30, 0),
+    )
+    assert name == "courses_2024_20260715_113000.xlsx"
 
 
 def test_export_body_from_params_list_mode():

@@ -526,7 +526,9 @@ async def _stream_file_chunks(path: str, *, unlink_after: bool = True) -> AsyncI
                 logger.exception("Failed to remove temporary export file %s", path)
 
 
-async def _export_courses_response(es, body: dict | None) -> StreamingResponse:
+async def _export_courses_response(
+    es, body: dict | None, params: dict | None = None
+) -> StreamingResponse:
     fd, path = tempfile.mkstemp(suffix=".xlsx")
     os.close(fd)
     try:
@@ -544,7 +546,7 @@ async def _export_courses_response(es, body: dict | None) -> StreamingResponse:
             pass
         raise
 
-    filename = f"courses_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename = _export_download_filename(params)
     return StreamingResponse(
         _stream_file_chunks(path),
         media_type=EXPORT_MEDIA_TYPE,
@@ -609,6 +611,37 @@ def _build_conditions_summary(params: dict) -> str:
     if params.get("has_reg_course_man"):
         parts.append("수강신청 인원 있음")
     return ", ".join(parts)
+
+
+def _export_year_label(params: dict | None) -> str | None:
+    """다운로드 파일명에 넣을 과정 년도 라벨 (예: '2025', '2024-2025')."""
+    if not params:
+        return None
+    if params.get("owned_year") is not None:
+        return str(int(params["owned_year"]))
+    st = str(params.get("srch_tra_st_dt") or "").strip()
+    end = str(params.get("srch_tra_end_dt") or "").strip()
+    st_es = _to_es_date(st) if st else ""
+    end_es = _to_es_date(end) if end else ""
+    if len(st_es) >= 4 and st_es[:4].isdigit():
+        start_year = st_es[:4]
+        if len(end_es) >= 4 and end_es[:4].isdigit() and end_es[:4] != start_year:
+            return f"{start_year}-{end_es[:4]}"
+        return start_year
+    return None
+
+
+def _export_download_filename(
+    params: dict | None = None,
+    *,
+    when: datetime | None = None,
+) -> str:
+    """다운로드용 파일명. 예: courses_2025_20260715_113000.xlsx"""
+    ts = (when or datetime.now()).strftime("%Y%m%d_%H%M%S")
+    year = _export_year_label(params)
+    if year:
+        return f"courses_{year}_{ts}.xlsx"
+    return f"courses_{ts}.xlsx"
 
 
 def _export_body_from_params(params: dict, names: list[str] | None) -> dict | None:
@@ -783,31 +816,40 @@ async def export_courses(
     _user=Depends(current_active_user),
 ) -> StreamingResponse:
     es = get_es()
-    is_owned_search = owned_year is not None
+    params = _normalize_export_params(
+        srch_tra_st_dt=srch_tra_st_dt,
+        srch_tra_end_dt=srch_tra_end_dt,
+        srch_tra_organ_nm=srch_tra_organ_nm,
+        srch_tra_process_nm=srch_tra_process_nm,
+        has_reg_course_man=has_reg_course_man,
+        owned_year=owned_year,
+        min_score=min_score,
+    )
+    is_owned_search = params.get("owned_year") is not None
 
     if is_owned_search:
         names = await _load_active_owned_names(session)
         body = (
-            _build_owned_scroll_body(names, owned_year, min_score, has_reg_course_man)
+            _build_owned_scroll_body(
+                names,
+                int(params["owned_year"]),
+                float(params.get("min_score") or 0),
+                bool(params.get("has_reg_course_man")),
+            )
             if names
             else None
         )
     else:
-        if not srch_tra_st_dt or not srch_tra_end_dt:
-            raise HTTPException(
-                status_code=400,
-                detail="srch_tra_st_dt and srch_tra_end_dt are required",
-            )
-        st_dt = _normalize_work24_date(srch_tra_st_dt, "srch_tra_st_dt")
-        end_dt = _normalize_work24_date(srch_tra_end_dt, "srch_tra_end_dt")
-        organ_nm = srch_tra_organ_nm.strip() if srch_tra_organ_nm else None
-        process_nm = srch_tra_process_nm.strip() if srch_tra_process_nm else None
         body = _build_list_scroll_body(
-            st_dt, end_dt, organ_nm, process_nm, has_reg_course_man
+            str(params["srch_tra_st_dt"]),
+            str(params["srch_tra_end_dt"]),
+            params.get("srch_tra_organ_nm"),
+            params.get("srch_tra_process_nm"),
+            bool(params.get("has_reg_course_man")),
         )
 
     try:
-        return await _export_courses_response(es, body)
+        return await _export_courses_response(es, body, params)
     except HTTPException:
         raise
     except Exception:

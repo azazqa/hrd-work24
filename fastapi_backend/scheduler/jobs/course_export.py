@@ -15,6 +15,7 @@ from app.database import async_session_maker
 from app.models import CourseExportJob
 from app.routes.courses import (
     _export_body_from_params,
+    _export_download_filename,
     _load_active_owned_names,
     _write_courses_xlsx,
     _write_empty_courses_xlsx,
@@ -74,7 +75,7 @@ async def _run_export(export_id: int) -> dict[str, Any]:
         await es.close()
 
     file_size = os.path.getsize(path) if os.path.exists(path) else None
-    file_name = f"courses_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    file_name = _export_download_filename(params)
 
     async with async_session_maker() as session:
         job = await session.get(CourseExportJob, export_id)
