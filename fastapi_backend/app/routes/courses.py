@@ -207,13 +207,20 @@ def _tra_start_date_year_filter(year: int) -> dict:
 _COURSE_ID_SORT_FIELDS = ("trainstCstId", "trprId", "trprDegr")
 
 
+def _keyword_sort(field: str) -> dict:
+    return {field: {"order": "asc", "missing": "_last", "unmapped_type": "keyword"}}
+
+
 def _course_id_sort(*, include_score: bool = False) -> list[dict]:
-    """TRAINST_CST_ID → TRPR_ID → TRPR_DEGR 순 정렬 (.keyword: text 매핑 인덱스 호환)."""
+    """훈련과정명 → 훈련기관명 → ID 순 정렬 (asc)."""
     sort: list[dict] = []
     if include_score:
         sort.append({"_score": "desc"})
+    # COURSE_INDEX_BODY: trngCrseNm.raw(keyword), instNm(keyword)
+    sort.append(_keyword_sort("trngCrseNm.raw"))
+    sort.append(_keyword_sort("instNm"))
     for field in _COURSE_ID_SORT_FIELDS:
-        sort.append({f"{field}.keyword": {"order": "asc", "missing": "_last"}})
+        sort.append(_keyword_sort(f"{field}.keyword"))
     return sort
 
 

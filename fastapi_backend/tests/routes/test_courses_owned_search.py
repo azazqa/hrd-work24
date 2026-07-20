@@ -9,15 +9,47 @@ from app.routes.courses import (
 
 def test_course_id_sort_order():
     assert _course_id_sort() == [
-        {"trainstCstId.keyword": {"order": "asc", "missing": "_last"}},
-        {"trprId.keyword": {"order": "asc", "missing": "_last"}},
-        {"trprDegr.keyword": {"order": "asc", "missing": "_last"}},
+        {
+            "trngCrseNm.raw": {
+                "order": "asc",
+                "missing": "_last",
+                "unmapped_type": "keyword",
+            }
+        },
+        {
+            "instNm": {
+                "order": "asc",
+                "missing": "_last",
+                "unmapped_type": "keyword",
+            }
+        },
+        {
+            "trainstCstId.keyword": {
+                "order": "asc",
+                "missing": "_last",
+                "unmapped_type": "keyword",
+            }
+        },
+        {
+            "trprId.keyword": {
+                "order": "asc",
+                "missing": "_last",
+                "unmapped_type": "keyword",
+            }
+        },
+        {
+            "trprDegr.keyword": {
+                "order": "asc",
+                "missing": "_last",
+                "unmapped_type": "keyword",
+            }
+        },
     ]
 
 
 def test_course_id_sort_with_score():
     assert _course_id_sort(include_score=True)[0] == {"_score": "desc"}
-    assert len(_course_id_sort(include_score=True)) == 4
+    assert len(_course_id_sort(include_score=True)) == 6
 
 
 def test_owned_name_clause_uses_substring_not_ngram():
