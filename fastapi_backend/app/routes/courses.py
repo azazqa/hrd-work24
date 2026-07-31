@@ -266,12 +266,27 @@ def _build_list_query(
         )
     if process_nm and process_nm.strip():
         keyword = process_nm.strip()
+        escaped = _escape_es_wildcard(keyword)
         must.append(
             {
                 "bool": {
                     "should": [
-                        {"match": {"trngCrseNm.nori": {"query": keyword}}},
-                        {"wildcard": {"trngCrseNm.raw": {"value": f"*{keyword}*"}}},
+                        {
+                            "match_phrase": {
+                                "trngCrseNm.nori": {
+                                    "query": keyword,
+                                    "slop": 2,
+                                }
+                            }
+                        },
+                        {
+                            "wildcard": {
+                                "trngCrseNm.raw": {
+                                    "value": f"*{escaped}*",
+                                    "case_insensitive": True,
+                                }
+                            }
+                        },
                     ],
                     "minimum_should_match": 1,
                 }
