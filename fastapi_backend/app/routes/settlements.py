@@ -669,49 +669,97 @@ def _transform_compare_items(rows: list[Any]) -> list[OwnedSettlementCompareItem
     return items
 
 
+def _normalize_name_for_mapping(value: str | None) -> str:
+    """비교용 정규화: 모든 공백(공백·탭·개행 등) 제거."""
+    if value is None:
+        return ""
+    return "".join(str(value).split())
+
+
 async def _auto_register_identity_mappings(session: AsyncSession, year: int) -> int:
-    """훈련기관명 == 고객사명이면 맵핑 자동 등록. soft-delete된 행은 되살리지 않음."""
-    owned_names = (
-        await session.execute(
-            select(func.distinct(func.trim(OwnedCourseOpening.institution_name))).where(
-                OwnedCourseOpening.is_delete == False,  # noqa: E712
-                OwnedCourseOpening.year == year,
-                OwnedCourseOpening.institution_name.is_not(None),
-                func.trim(OwnedCourseOpening.institution_name) != "",
-            )
-        )
-    ).scalars().all()
-    client_names = (
-        await session.execute(
-            select(func.distinct(func.trim(Settlement.client_name))).where(
-                Settlement.is_delete == False,  # noqa: E712
-                Settlement.client_name.is_not(None),
-                func.trim(Settlement.client_name) != "",
-            )
-        )
-    ).scalars().all()
+    """공백 제거 후 훈련기관명==고객사명이면 맵핑 자동 등록.
 
-    candidates = {n for n in owned_names if n} & {n for n in client_names if n}
-    if not candidates:
+    soft-delete된 행은 되살리지 않음. 저장 값은 원본(양쪽 trim)을 유지한다.
+    """
+    owned_names = [
+        n
+        for n in (
+            await session.execute(
+                select(func.distinct(func.trim(OwnedCourseOpening.institution_name))).where(
+                    OwnedCourseOpening.is_delete == False,  # noqa: E712
+                    OwnedCourseOpening.year == year,
+                    OwnedCourseOpening.institution_name.is_not(None),
+                    func.trim(OwnedCourseOpening.institution_name) != "",
+                )
+            )
+        ).scalars().all()
+        if n
+    ]
+    client_names = [
+        n
+        for n in (
+            await session.execute(
+                select(func.distinct(func.trim(Settlement.client_name))).where(
+                    Settlement.is_delete == False,  # noqa: E712
+                    Settlement.client_name.is_not(None),
+                    func.trim(Settlement.client_name) != "",
+                )
+            )
+        ).scalars().all()
+        if n
+    ]
+    if not owned_names or not client_names:
         return 0
 
-    existing = (
-        await session.execute(
-            select(ClientNameMapping.institution_name).where(
-                ClientNameMapping.institution_name.in_(candidates)
-            )
-        )
-    ).scalars().all()
-    to_create = candidates - set(existing)
-    if not to_create:
+    owned_by_key: dict[str, list[str]] = {}
+    for name in owned_names:
+        key = _normalize_name_for_mapping(name)
+        if not key:
+            continue
+        owned_by_key.setdefault(key, []).append(name)
+
+    clients_by_key: dict[str, list[str]] = {}
+    for name in client_names:
+        key = _normalize_name_for_mapping(name)
+        if not key:
+            continue
+        clients_by_key.setdefault(key, []).append(name)
+
+    matched_keys = set(owned_by_key) & set(clients_by_key)
+    if not matched_keys:
         return 0
 
-    for name in sorted(to_create):
-        session.add(
-            ClientNameMapping(institution_name=name, client_name=name)
-        )
-    await session.commit()
-    return len(to_create)
+    candidate_institutions = sorted(
+        {inst for key in matched_keys for inst in owned_by_key[key]}
+    )
+    existing = set(
+        (
+            await session.execute(
+                select(ClientNameMapping.institution_name).where(
+                    ClientNameMapping.institution_name.in_(candidate_institutions)
+                )
+            )
+        ).scalars().all()
+    )
+
+    created = 0
+    for key in sorted(matched_keys):
+        client_candidates = sorted(clients_by_key[key])
+        client_set = set(client_candidates)
+        for inst in sorted(owned_by_key[key]):
+            if inst in existing:
+                continue
+            # 표기가 동일한 고객사명을 우선, 없으면 공백 제거 결과가 같은 첫 고객사명
+            client = inst if inst in client_set else client_candidates[0]
+            session.add(
+                ClientNameMapping(institution_name=inst, client_name=client)
+            )
+            existing.add(inst)
+            created += 1
+
+    if created:
+        await session.commit()
+    return created
 
 
 async def _scroll_owned_courses(es, body: dict) -> list[dict[str, Any]]:

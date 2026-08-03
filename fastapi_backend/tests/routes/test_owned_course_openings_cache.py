@@ -141,6 +141,60 @@ async def test_compare_auto_registers_identity_mapping(
 
 
 @pytest.mark.asyncio
+async def test_compare_auto_registers_mapping_ignoring_internal_spaces(
+    test_client, authenticated_user, db_session
+):
+    headers = authenticated_user["headers"]
+    extracted_at = datetime.now(timezone.utc)
+    db_session.add(
+        OwnedCourseOpening(
+            year=2024,
+            institution_name="에이 비씨",
+            course_name="과정공백",
+            tra_start_date=date(2024, 7, 1),
+            extracted_at=extracted_at,
+        )
+    )
+    db_session.add(
+        Settlement(
+            purchase_ym="202407",
+            purchase_year=2024,
+            client_name="에이비씨",
+            course_name="과정공백",
+            education_period_date=date(2024, 7, 1),
+        )
+    )
+    await db_session.commit()
+
+    res = await test_client.get(
+        "/settlements/compare-owned?year=2024",
+        headers=headers,
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["matched"] == 1
+    assert body["unmapped"] == 0
+
+    mapping = (
+        await db_session.execute(
+            select(ClientNameMapping).where(
+                ClientNameMapping.institution_name == "에이 비씨",
+                ClientNameMapping.is_delete == False,  # noqa: E712
+            )
+        )
+    ).scalars().one()
+    assert mapping.client_name == "에이비씨"
+
+
+def test_normalize_name_for_mapping_removes_all_whitespace():
+    from app.routes.settlements import _normalize_name_for_mapping
+
+    assert _normalize_name_for_mapping(" 에이 비씨 ") == "에이비씨"
+    assert _normalize_name_for_mapping("에이\t비씨\n") == "에이비씨"
+    assert _normalize_name_for_mapping(None) == ""
+
+
+@pytest.mark.asyncio
 async def test_compare_does_not_revive_soft_deleted_mapping(
     test_client, authenticated_user, db_session
 ):
