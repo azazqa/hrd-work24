@@ -45,17 +45,23 @@ HEADER_TO_FIELD_NORM = {
 }
 
 _YM_DIGITS_RE = re.compile(r"\D+")
-_RANGE_SPLIT_RE = re.compile(r"[~～∼]+")
-_DATE_FORMATS = (
+# 전처리 후 구간: YYYYMMDD-YYYYMMDD / YYYYMMDD~YYYYMMDD
+_COMPACT_RANGE_RE = re.compile(r"^(\d{8})[~-](\d{8})$")
+# 전처리 후 구간: 2023-11-17~2023-12-14 / 2023-11-17-2023-12-14
+_HYPHEN_DATE_RANGE_RE = re.compile(
+    r"^(\d{4}-\d{1,2}-\d{1,2})[~-](\d{4}-\d{1,2}-\d{1,2})$"
+)
+# 전처리 후 단일 날짜: 숫자 3부분 (구분자 - 또는 /)
+_DATE_PARTS_RE = re.compile(
+    r"^(\d{1,4})[-/](\d{1,2})[-/](\d{1,4})$"
+)
+_DATE_FORMATS_YEAR_FIRST = (
     "%Y-%m-%d",
-    "%Y.%m.%d",
     "%Y/%m/%d",
     "%Y%m%d",
     "%y-%m-%d",
-    "%y.%m.%d",
     "%y/%m/%d",
 )
-
 
 def _parse_str(value: Any) -> str | None:
     if value is None:
@@ -130,21 +136,87 @@ def _parse_rate(value: Any) -> Decimal | None:
     return Decimal(text)
 
 
-def _parse_single_date_text(text: str) -> date | None:
-    cleaned = text.strip()
-    if not cleaned:
+def _safe_date(year: int, month: int, day: int) -> date | None:
+    try:
+        return date(year, month, day)
+    except ValueError:
         return None
-    for fmt in _DATE_FORMATS:
+
+
+def _normalize_year(year: int) -> int:
+    """2자리 연도 → 2000년대 기준 4자리."""
+    if year < 100:
+        return 2000 + year
+    return year
+
+
+def _parse_dmy_or_mdy(a: int, b: int, year: int) -> date | None:
+    """연도가 끝인 경우. 모호하면 일-월-년(DMY). 한쪽만 타당하면 그쪽."""
+    year = _normalize_year(year)
+    dmy = _safe_date(year, b, a)  # a=day, b=month
+    mdy = _safe_date(year, a, b)  # a=month, b=day
+    if a > 12 and b <= 12:
+        return dmy
+    if b > 12 and a <= 12:
+        return mdy
+    # 둘 다 가능하면 DMY 우선
+    return dmy or mdy
+
+
+def _preprocess_education_period(text: str) -> str:
+    """교육기간 전처리: 공백 제거, '.' → '-'."""
+    normalized = re.sub(r"\s+", "", text.strip())
+    normalized = normalized.replace(".", "-")
+    # 유사 구간/대시 문자를 통일
+    normalized = re.sub(r"[～∼〜⁓]", "~", normalized)
+    normalized = re.sub(r"[–—]", "-", normalized)
+    return normalized
+
+
+def _extract_range_start(text: str) -> str:
+    """전처리된 교육기간 구간이면 시작일 텍스트만 반환."""
+    for pattern in (_COMPACT_RANGE_RE, _HYPHEN_DATE_RANGE_RE):
+        m = pattern.match(text)
+        if m:
+            return m.group(1)
+
+    if "~" in text:
+        return text.split("~", maxsplit=1)[0]
+    return text
+
+
+def _parse_single_date_text(text: str) -> date | None:
+    if not text:
+        return None
+
+    for fmt in _DATE_FORMATS_YEAR_FIRST:
         try:
-            return datetime.strptime(cleaned, fmt).date()
+            return datetime.strptime(text, fmt).date()
         except ValueError:
             continue
-    digits = _YM_DIGITS_RE.sub("", cleaned)
+
+    # YYYYMMDD (또는 앞 8자리)
+    digits = _YM_DIGITS_RE.sub("", text)
     if len(digits) >= 8 and digits[:8].isdigit():
-        try:
-            return datetime.strptime(digits[:8], "%Y%m%d").date()
-        except ValueError:
-            return None
+        parsed = _safe_date(int(digits[:4]), int(digits[4:6]), int(digits[6:8]))
+        if parsed is not None:
+            return parsed
+
+    m = _DATE_PARTS_RE.match(text)
+    if not m:
+        return None
+
+    p1, p2, p3 = m.group(1), m.group(2), m.group(3)
+    n1, n2, n3 = int(p1), int(p2), int(p3)
+
+    # 연도 선행: YYYY-M-D
+    if len(p1) == 4:
+        return _safe_date(n1, n2, n3)
+
+    # 연도 후행: D-M-YYYY / D-M-YY (모호 시 DMY)
+    if len(p3) in (2, 4):
+        return _parse_dmy_or_mdy(n1, n2, n3)
+
     return None
 
 
@@ -161,8 +233,8 @@ def _parse_education_period_date(value: Any) -> date | None:
     if not text:
         return None
 
-    # 구간(2023.11.01~2023.11.30) → 앞쪽만
-    first = _RANGE_SPLIT_RE.split(text, maxsplit=1)[0].strip()
+    normalized = _preprocess_education_period(text)
+    first = _extract_range_start(normalized)
     return _parse_single_date_text(first)
 
 

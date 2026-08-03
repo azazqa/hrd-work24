@@ -10,6 +10,7 @@ from app.routes.settlements import (
     _normalize_ym,
     _parse_education_period_date,
     _parse_rate,
+    _preprocess_education_period,
     _row_to_fields,
     _year_from_ym,
 )
@@ -33,6 +34,12 @@ def test_parse_rate_percent_and_decimal():
     assert _parse_rate(None) is None
 
 
+def test_preprocess_education_period():
+    assert _preprocess_education_period("2023.11.17 ~ 2023.12.14") == "2023-11-17~2023-12-14"
+    assert _preprocess_education_period(" 2023.10.01 ") == "2023-10-01"
+    assert _preprocess_education_period("23.11.01") == "23-11-01"
+
+
 def test_parse_education_period_date_formats():
     assert _parse_education_period_date("2023.11.01~2023.11.30") == date(2023, 11, 1)
     assert _parse_education_period_date("2023-09-01") == date(2023, 9, 1)
@@ -43,6 +50,30 @@ def test_parse_education_period_date_formats():
     assert _parse_education_period_date("not-a-date") is None
     assert _parse_education_period_date(None) is None
     assert _parse_education_period_date("") is None
+    assert _parse_education_period_date("2023.11.17 ~ 2023.12.14") == date(2023, 11, 17)
+
+
+def test_parse_education_period_date_user_samples():
+    assert _parse_education_period_date("2023-05-24") == date(2023, 5, 24)
+    assert _parse_education_period_date("2022-04-12~2022-05-11") == date(2022, 4, 12)
+    assert _parse_education_period_date("2023.10.01") == date(2023, 10, 1)
+    # 연도 후행 + 모호 → DMY
+    assert _parse_education_period_date("05-10-2023") == date(2023, 10, 5)
+    assert _parse_education_period_date("23.11.01") == date(2023, 11, 1)
+    assert _parse_education_period_date("01-5-2024") == date(2024, 5, 1)
+    # day>12 → MDY로만 해석 가능
+    assert _parse_education_period_date("05-13-2023") == date(2023, 5, 13)
+    # month>12 불가, day>12 → DMY
+    assert _parse_education_period_date("13-05-2023") == date(2023, 5, 13)
+
+
+def test_parse_education_period_date_compact_and_dotted_ranges():
+    assert _parse_education_period_date("2023.11.17~2023.12.14") == date(2023, 11, 17)
+    assert _parse_education_period_date("2023.11.17-2023.12.14") == date(2023, 11, 17)
+    assert _parse_education_period_date("20231201-20231231") == date(2023, 12, 1)
+    assert _parse_education_period_date("20231201~20231231") == date(2023, 12, 1)
+    # 단일 하이픈 날짜는 구간으로 오인하지 않음
+    assert _parse_education_period_date("2023-05-24") == date(2023, 5, 24)
 
 
 def test_row_to_fields_builds_purchase_year():

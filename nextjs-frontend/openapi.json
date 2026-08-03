@@ -2278,6 +2278,195 @@
         }
       }
     },
+    "/settlements": {
+      "get": {
+        "tags": [
+          "settlements"
+        ],
+        "summary": "List Settlements",
+        "operationId": "list_settlements",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Page size",
+              "default": 50,
+              "title": "Size"
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "\ub9e4\uc785\ub144\ub3c4",
+              "title": "Year"
+            },
+            "description": "\ub9e4\uc785\ub144\ub3c4"
+          },
+          {
+            "name": "client_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "\uace0\uac1d\uc0ac \uac80\uc0c9",
+              "title": "Client Name"
+            },
+            "description": "\uace0\uac1d\uc0ac \uac80\uc0c9"
+          },
+          {
+            "name": "course_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "\uacfc\uc815\uba85 \uac80\uc0c9",
+              "title": "Course Name"
+            },
+            "description": "\uacfc\uc815\uba85 \uac80\uc0c9"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SettlementListItem_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settlements/import/template": {
+      "get": {
+        "tags": [
+          "settlements"
+        ],
+        "summary": "Download Import Template",
+        "operationId": "download_import_template",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/settlements/import": {
+      "post": {
+        "tags": [
+          "settlements"
+        ],
+        "summary": "Import Settlements",
+        "operationId": "import_settlements",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_settlements-import_settlements"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettlementImportResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/admin/work24-api-logs": {
       "get": {
         "tags": [
@@ -2486,6 +2675,28 @@
           "file"
         ],
         "title": "Body_owned-courses-import_owned_courses"
+      },
+      "Body_settlements-import_settlements": {
+        "properties": {
+          "year": {
+            "type": "integer",
+            "maximum": 2100.0,
+            "minimum": 2000.0,
+            "title": "Year",
+            "description": "\uad50\uccb4\ud560 \ub9e4\uc785\ub144\ub3c4"
+          },
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "year",
+          "file"
+        ],
+        "title": "Body_settlements-import_settlements"
       },
       "CourseExportJobCreate": {
         "properties": {
@@ -3893,6 +4104,72 @@
         ],
         "title": "Page[SchedulerJobQueueRead]"
       },
+      "Page_SettlementListItem_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SettlementListItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "size"
+        ],
+        "title": "Page[SettlementListItem]"
+      },
       "Page_Work24ApiLogRead_": {
         "properties": {
           "items": {
@@ -4339,6 +4616,184 @@
         },
         "type": "object",
         "title": "SchedulerJobUpdate"
+      },
+      "SettlementImportError": {
+        "properties": {
+          "row": {
+            "type": "integer",
+            "title": "Row"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "row",
+          "message"
+        ],
+        "title": "SettlementImportError"
+      },
+      "SettlementImportResult": {
+        "properties": {
+          "deleted": {
+            "type": "integer",
+            "title": "Deleted"
+          },
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/SettlementImportError"
+            },
+            "type": "array",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "deleted",
+          "created",
+          "failed"
+        ],
+        "title": "SettlementImportResult"
+      },
+      "SettlementListItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "purchase_ym": {
+            "type": "string",
+            "title": "Purchase Ym"
+          },
+          "purchase_year": {
+            "type": "integer",
+            "title": "Purchase Year"
+          },
+          "sales_ym": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sales Ym"
+          },
+          "client_name": {
+            "type": "string",
+            "title": "Client Name"
+          },
+          "course_name": {
+            "type": "string",
+            "title": "Course Name"
+          },
+          "education_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Education Period"
+          },
+          "education_period_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Education Period Date"
+          },
+          "headcount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headcount"
+          },
+          "base_tuition": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Tuition"
+          },
+          "net_sales": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Sales"
+          },
+          "settlement_amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settlement Amount"
+          },
+          "sales_rep": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sales Rep"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "purchase_ym",
+          "purchase_year",
+          "sales_ym",
+          "client_name",
+          "course_name",
+          "education_period",
+          "education_period_date",
+          "headcount",
+          "base_tuition",
+          "net_sales",
+          "settlement_amount",
+          "sales_rep"
+        ],
+        "title": "SettlementListItem"
       },
       "UserRead": {
         "properties": {
