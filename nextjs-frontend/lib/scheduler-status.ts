@@ -56,7 +56,12 @@ export type SchedulerQueuePage = {
 };
 
 /** 코드에 등록된 job_key (백엔드 REGISTERED_JOB_KEYS와 동기) */
-export const REGISTERED_JOB_KEYS = ["course_index_refresh", "legacy_course_index"] as const;
+export const REGISTERED_JOB_KEYS = [
+  "course_index_refresh",
+  "legacy_course_index",
+  "course_export",
+  "owned_course_opening_extract",
+] as const;
 
 export type RegisteredJobKey = (typeof REGISTERED_JOB_KEYS)[number];
 
