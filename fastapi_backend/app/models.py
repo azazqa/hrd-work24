@@ -186,6 +186,25 @@ class ClientNameMapping(Base):
     client_name = Column(String(255), nullable=False, index=True)
 
 
+class OwnedCourseOpening(Base):
+    """개설된 보유과정 캐시 (ES 추출 스냅샷, 연도별 교체)."""
+
+    __tablename__ = "owned_course_openings"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    year = Column(Integer, nullable=False, index=True)
+    institution_name = Column(String(255), nullable=True)
+    course_name = Column(String(500), nullable=True)
+    tra_start_date = Column(Date, nullable=True)
+    tra_end_date = Column(Date, nullable=True)
+    reg_course_man = Column(String(50), nullable=True)
+    extracted_at = Column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        Index("ix_owned_course_openings_year_tra_start", "year", "tra_start_date"),
+    )
+
+
 class Work24ApiLog(Base):
     """Work24 Open API 호출 이력 (headers only)."""
 

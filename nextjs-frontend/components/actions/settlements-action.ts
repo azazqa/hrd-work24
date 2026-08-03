@@ -48,9 +48,17 @@ export type OwnedSettlementCompareResult = {
   matched: number;
   unsettled: number;
   unmapped: number;
+  cache_hit: boolean;
+  extracted_at: string | null;
   items_matched: OwnedSettlementCompareItem[];
   items_unsettled: OwnedSettlementCompareItem[];
   items_unmapped: OwnedSettlementCompareItem[];
+};
+
+export type OwnedCourseOpeningRefreshResult = {
+  year: number;
+  row_count: number;
+  extracted_at: string;
 };
 
 function formatApiError(detail: unknown): string {
@@ -133,4 +141,39 @@ export async function compareOwnedSettlements(
   }
 
   return (await res.json()) as OwnedSettlementCompareResult;
+}
+
+export async function refreshOwnedCourseOpenings(
+  year: number,
+): Promise<OwnedCourseOpeningRefreshResult | { message: string }> {
+  const baseURL = process.env.API_BASE_URL;
+  if (!baseURL) {
+    return { message: "API_BASE_URL is not configured" };
+  }
+
+  const token = await requireAccessToken();
+  const q = new URLSearchParams();
+  q.set("year", String(year));
+
+  const res = await fetch(
+    `${baseURL}/settlements/compare-owned/refresh?${q.toString()}`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    },
+  );
+
+  if (!res.ok) {
+    let message = `추출에 실패했습니다. (HTTP ${res.status})`;
+    try {
+      const body = (await res.json()) as { detail?: unknown };
+      message = formatApiError(body.detail) || message;
+    } catch {
+      /* ignore */
+    }
+    return { message };
+  }
+
+  return (await res.json()) as OwnedCourseOpeningRefreshResult;
 }

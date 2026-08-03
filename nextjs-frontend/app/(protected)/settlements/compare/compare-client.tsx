@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { createClientMappingAction } from "@/components/actions/client-mappings-action";
-import type {
-  OwnedSettlementCompareItem,
-  OwnedSettlementCompareResult,
+import {
+  refreshOwnedCourseOpenings,
+  type OwnedSettlementCompareItem,
+  type OwnedSettlementCompareResult,
 } from "@/components/actions/settlements-action";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +21,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -28,6 +36,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatDateTimeInSeoul, getSettlementCompareYearOptions } from "@/lib/date-utils";
 
 type Props = {
   year?: number;
@@ -101,16 +110,21 @@ function CompareTable({
 
 export function CompareOwnedClient({ year, result, error }: Props) {
   const router = useRouter();
-  const [yearInput, setYearInput] = useState(
-    String(year ?? new Date().getFullYear()),
-  );
+  const yearOptions = useMemo(() => getSettlementCompareYearOptions(), []);
+  const defaultYear = yearOptions[0] ?? new Date().getFullYear();
+  const initialYear =
+    year != null && yearOptions.includes(year) ? year : defaultYear;
+  const [yearInput, setYearInput] = useState(String(initialYear));
   const [mapInst, setMapInst] = useState<string | null>(null);
   const [clientName, setClientName] = useState("");
   const [mapError, setMapError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
 
   const summary = useMemo(() => {
-    if (!result) return null;
+    if (!result || !result.cache_hit) return null;
     return [
       { label: "전체", value: result.total },
       { label: "정산됨", value: result.matched },
@@ -122,8 +136,29 @@ export function CompareOwnedClient({ year, result, error }: Props) {
   const onSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const y = Number(yearInput);
-    if (!Number.isFinite(y) || y < 2000 || y > 2100) return;
+    if (!yearOptions.includes(y)) return;
+    setRefreshError(null);
+    setRefreshMessage(null);
     router.push(`/settlements/compare?year=${y}`);
+  };
+
+  const onRefresh = async () => {
+    const y = Number(yearInput);
+    if (!yearOptions.includes(y)) return;
+    setRefreshing(true);
+    setRefreshError(null);
+    setRefreshMessage(null);
+    const res = await refreshOwnedCourseOpenings(y);
+    setRefreshing(false);
+    if ("message" in res) {
+      setRefreshError(res.message);
+      return;
+    }
+    setRefreshMessage(
+      `${res.year}년 개설 보유과정 ${res.row_count.toLocaleString()}건을 추출했습니다.`,
+    );
+    router.push(`/settlements/compare?year=${y}`);
+    router.refresh();
   };
 
   const onCreateMapping = async () => {
@@ -149,22 +184,50 @@ export function CompareOwnedClient({ year, result, error }: Props) {
       <form onSubmit={onSearch} className="flex flex-wrap items-end gap-4">
         <div className="space-y-2">
           <Label htmlFor="year">비교 연도</Label>
-          <Input
-            id="year"
-            type="number"
-            min={2000}
-            max={2100}
-            value={yearInput}
-            onChange={(e) => setYearInput(e.target.value)}
-            className="w-40"
-          />
+          <Select value={yearInput} onValueChange={setYearInput}>
+            <SelectTrigger id="year" className="w-40">
+              <SelectValue placeholder="연도 선택" />
+            </SelectTrigger>
+            <SelectContent>
+              {yearOptions.map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  {y}년
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <Button type="submit">비교</Button>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onRefresh}
+          disabled={refreshing}
+        >
+          {refreshing ? "추출 중…" : "추출/갱신"}
+        </Button>
         <Button type="button" variant="outline" asChild>
           <Link href="/settlements/mappings">고객사 맵핑 관리</Link>
         </Button>
       </form>
 
+      {result?.extracted_at ? (
+        <p className="text-sm text-muted-foreground">
+          마지막 추출: {formatDateTimeInSeoul(result.extracted_at)}
+        </p>
+      ) : year != null ? (
+        <p className="text-sm text-muted-foreground">
+          해당 연도 추출 캐시가 없습니다. 「추출/갱신」으로 먼저 개설 보유과정을
+          저장하세요.
+        </p>
+      ) : null}
+
+      {refreshError ? (
+        <p className="text-sm text-destructive">{refreshError}</p>
+      ) : null}
+      {refreshMessage ? (
+        <p className="text-sm text-muted-foreground">{refreshMessage}</p>
+      ) : null}
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       {summary ? (
@@ -180,7 +243,7 @@ export function CompareOwnedClient({ year, result, error }: Props) {
         </div>
       ) : null}
 
-      {result ? (
+      {result?.cache_hit ? (
         <Tabs defaultValue="unsettled">
           <TabsList>
             <TabsTrigger value="unsettled">
@@ -209,7 +272,7 @@ export function CompareOwnedClient({ year, result, error }: Props) {
             <CompareTable items={result.items_matched} showClient />
           </TabsContent>
         </Tabs>
-      ) : !error ? (
+      ) : !error && year == null ? (
         <p className="text-sm text-muted-foreground">
           연도를 선택하고 비교를 실행하세요.
         </p>

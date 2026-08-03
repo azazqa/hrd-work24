@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import logging
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
 
@@ -12,13 +12,13 @@ from fastapi.responses import StreamingResponse
 from fastapi_pagination.ext.sqlalchemy import apaginate
 from openpyxl import Workbook, load_workbook
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_async_session
 from app.es import get_es
-from app.models import ClientNameMapping, Settlement, User
+from app.models import ClientNameMapping, OwnedCourseOpening, Settlement, User
 from app.pagination import MAX_PAGE_SIZE, Page, Params
 from app.routes.courses import (
     MAX_EXPORT_ROWS,
@@ -510,9 +510,17 @@ class OwnedSettlementCompareResult(BaseModel):
     matched: int
     unsettled: int
     unmapped: int
+    cache_hit: bool = False
+    extracted_at: datetime | None = None
     items_matched: list[OwnedSettlementCompareItem] = Field(default_factory=list)
     items_unsettled: list[OwnedSettlementCompareItem] = Field(default_factory=list)
     items_unmapped: list[OwnedSettlementCompareItem] = Field(default_factory=list)
+
+
+class OwnedCourseOpeningRefreshResult(BaseModel):
+    year: int
+    row_count: int
+    extracted_at: datetime
 
 
 def _normalize_compare_date(value: Any) -> date | None:
@@ -536,6 +544,12 @@ def _normalize_compare_date(value: Any) -> date | None:
         return datetime.strptime(text[:10], "%Y-%m-%d").date()
     except ValueError:
         return None
+
+
+def _format_date_for_response(value: date | None) -> str | None:
+    if value is None:
+        return None
+    return value.isoformat()
 
 
 def _classify_owned_course(
@@ -608,28 +622,7 @@ async def _scroll_owned_courses(es, body: dict) -> list[dict[str, Any]]:
     return rows
 
 
-@router.get("/compare-owned", response_model=OwnedSettlementCompareResult)
-async def compare_owned_with_settlements(
-    year: int = Query(..., ge=2000, le=2100, description="비교 연도(훈련시작일/교육기간)"),
-    min_score: float = Query(default=0, ge=0, description="보유과정 ES 매칭 min_score"),
-    session: AsyncSession = Depends(get_async_session),
-    _: User = Depends(current_active_user),
-):
-    names = await _load_active_owned_names(session)
-    owned_rows: list[dict[str, Any]] = []
-    if names:
-        body = _build_owned_scroll_body(names, year, min_score, False)
-        es = get_es()
-        try:
-            owned_rows = await _scroll_owned_courses(es, body)
-        except HTTPException:
-            raise
-        except Exception as exc:
-            logger.exception("Elasticsearch owned scroll failed for year=%s", year)
-            raise HTTPException(
-                status_code=502, detail=f"과정 검색에 실패했습니다: {exc}"
-            ) from exc
-
+async def _load_mapping_dict(session: AsyncSession) -> dict[str, str]:
     mapping_rows = (
         await session.execute(
             select(ClientNameMapping).where(
@@ -637,12 +630,16 @@ async def compare_owned_with_settlements(
             )
         )
     ).scalars().all()
-    mapping = {
+    return {
         (row.institution_name or "").strip(): (row.client_name or "").strip()
         for row in mapping_rows
         if (row.institution_name or "").strip() and (row.client_name or "").strip()
     }
 
+
+async def _load_settlement_keys(
+    session: AsyncSession, year: int
+) -> set[tuple[str, str, date]]:
     year_start = date(year, 1, 1)
     year_end = date(year, 12, 31)
     settlement_rows = (
@@ -666,7 +663,18 @@ async def compare_owned_with_settlements(
         settlement_keys.add(
             ((client_name or "").strip(), (course_name or "").strip(), ep_date)
         )
+    return settlement_keys
 
+
+def _build_compare_result(
+    *,
+    year: int,
+    owned_rows: list[dict[str, Any]],
+    mapping: dict[str, str],
+    settlement_keys: set[tuple[str, str, date]],
+    cache_hit: bool,
+    extracted_at: datetime | None,
+) -> OwnedSettlementCompareResult:
     items_matched: list[OwnedSettlementCompareItem] = []
     items_unsettled: list[OwnedSettlementCompareItem] = []
     items_unmapped: list[OwnedSettlementCompareItem] = []
@@ -680,12 +688,22 @@ async def compare_owned_with_settlements(
             mapping=mapping,
             settlement_keys=settlement_keys,
         )
+        tra_start = row.get("tra_start_date")
+        tra_end = row.get("tra_end_date")
         item = OwnedSettlementCompareItem(
             institution_name=row.get("institution_name"),
             client_name=mapped_client,
             course_name=row.get("course_name"),
-            tra_start_date=row.get("tra_start_date"),
-            tra_end_date=row.get("tra_end_date"),
+            tra_start_date=(
+                _format_date_for_response(tra_start)
+                if isinstance(tra_start, date)
+                else (str(tra_start) if tra_start else None)
+            ),
+            tra_end_date=(
+                _format_date_for_response(tra_end)
+                if isinstance(tra_end, date)
+                else (str(tra_end) if tra_end else None)
+            ),
             reg_course_man=row.get("reg_course_man"),
             status=status,
         )
@@ -702,7 +720,124 @@ async def compare_owned_with_settlements(
         matched=len(items_matched),
         unsettled=len(items_unsettled),
         unmapped=len(items_unmapped),
+        cache_hit=cache_hit,
+        extracted_at=extracted_at,
         items_matched=items_matched,
         items_unsettled=items_unsettled,
         items_unmapped=items_unmapped,
+    )
+
+
+@router.post(
+    "/compare-owned/refresh",
+    response_model=OwnedCourseOpeningRefreshResult,
+)
+async def refresh_owned_course_openings(
+    year: int = Query(..., ge=2000, le=2100, description="추출할 훈련시작일 연도"),
+    min_score: float = Query(default=0, ge=0, description="보유과정 ES 매칭 min_score"),
+    session: AsyncSession = Depends(get_async_session),
+    _: User = Depends(current_active_user),
+):
+    names = await _load_active_owned_names(session)
+    owned_rows: list[dict[str, Any]] = []
+    if names:
+        body = _build_owned_scroll_body(names, year, min_score, False)
+        es = get_es()
+        try:
+            owned_rows = await _scroll_owned_courses(es, body)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.exception("Elasticsearch owned scroll failed for year=%s", year)
+            raise HTTPException(
+                status_code=502, detail=f"과정 검색에 실패했습니다: {exc}"
+            ) from exc
+
+    extracted_at = datetime.now(timezone.utc)
+
+    await session.execute(
+        update(OwnedCourseOpening)
+        .where(
+            OwnedCourseOpening.is_delete == False,  # noqa: E712
+            OwnedCourseOpening.year == year,
+        )
+        .values(is_delete=True)
+    )
+
+    to_insert: list[OwnedCourseOpening] = []
+    for row in owned_rows:
+        to_insert.append(
+            OwnedCourseOpening(
+                year=year,
+                institution_name=(row.get("institution_name") or None),
+                course_name=(row.get("course_name") or None),
+                tra_start_date=_normalize_compare_date(row.get("tra_start_date")),
+                tra_end_date=_normalize_compare_date(row.get("tra_end_date")),
+                reg_course_man=(
+                    str(row["reg_course_man"])[:50]
+                    if row.get("reg_course_man") is not None
+                    else None
+                ),
+                extracted_at=extracted_at,
+            )
+        )
+    if to_insert:
+        session.add_all(to_insert)
+    await session.commit()
+
+    return OwnedCourseOpeningRefreshResult(
+        year=year,
+        row_count=len(to_insert),
+        extracted_at=extracted_at,
+    )
+
+
+@router.get("/compare-owned", response_model=OwnedSettlementCompareResult)
+async def compare_owned_with_settlements(
+    year: int = Query(..., ge=2000, le=2100, description="비교 연도(훈련시작일/교육기간)"),
+    session: AsyncSession = Depends(get_async_session),
+    _: User = Depends(current_active_user),
+):
+    cache_rows = (
+        await session.execute(
+            select(OwnedCourseOpening).where(
+                OwnedCourseOpening.is_delete == False,  # noqa: E712
+                OwnedCourseOpening.year == year,
+            )
+        )
+    ).scalars().all()
+
+    extracted_at = (
+        await session.scalar(
+            select(func.max(OwnedCourseOpening.extracted_at)).where(
+                OwnedCourseOpening.is_delete == False,  # noqa: E712
+                OwnedCourseOpening.year == year,
+            )
+        )
+        if cache_rows
+        else None
+    )
+    cache_hit = extracted_at is not None
+
+    owned_rows = [
+        {
+            "institution_name": row.institution_name,
+            "course_name": row.course_name,
+            "tra_start_date": row.tra_start_date,
+            "tra_end_date": row.tra_end_date,
+            "reg_course_man": row.reg_course_man,
+        }
+        for row in cache_rows
+    ]
+
+    mapping = await _load_mapping_dict(session)
+    settlement_keys = await _load_settlement_keys(session, year)
+
+    return _build_compare_result(
+        year=year,
+        owned_rows=owned_rows,
+        mapping=mapping,
+        settlement_keys=settlement_keys,
+        cache_hit=cache_hit,
+        extracted_at=extracted_at,
     )

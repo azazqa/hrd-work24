@@ -1,4 +1,5 @@
 import { compareOwnedSettlements } from "@/components/actions/settlements-action";
+import { getSettlementCompareYearOptions } from "@/lib/date-utils";
 
 import { CompareOwnedClient } from "./compare-client";
 
@@ -8,10 +9,11 @@ interface PageProps {
 
 export default async function CompareOwnedPage({ searchParams }: PageProps) {
   const params = await searchParams;
+  const yearOptions = getSettlementCompareYearOptions();
   const yearRaw = params.year?.trim();
   const yearNum = yearRaw ? Number(yearRaw) : undefined;
   const year =
-    yearNum != null && Number.isFinite(yearNum) && yearNum >= 2000 && yearNum <= 2100
+    yearNum != null && Number.isFinite(yearNum) && yearOptions.includes(yearNum)
       ? yearNum
       : undefined;
 
