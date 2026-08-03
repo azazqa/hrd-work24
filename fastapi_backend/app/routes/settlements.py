@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import re
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -44,6 +45,16 @@ HEADER_TO_FIELD_NORM = {
 }
 
 _YM_DIGITS_RE = re.compile(r"\D+")
+_RANGE_SPLIT_RE = re.compile(r"[~～∼]+")
+_DATE_FORMATS = (
+    "%Y-%m-%d",
+    "%Y.%m.%d",
+    "%Y/%m/%d",
+    "%Y%m%d",
+    "%y-%m-%d",
+    "%y.%m.%d",
+    "%y/%m/%d",
+)
 
 
 def _parse_str(value: Any) -> str | None:
@@ -119,6 +130,42 @@ def _parse_rate(value: Any) -> Decimal | None:
     return Decimal(text)
 
 
+def _parse_single_date_text(text: str) -> date | None:
+    cleaned = text.strip()
+    if not cleaned:
+        return None
+    for fmt in _DATE_FORMATS:
+        try:
+            return datetime.strptime(cleaned, fmt).date()
+        except ValueError:
+            continue
+    digits = _YM_DIGITS_RE.sub("", cleaned)
+    if len(digits) >= 8 and digits[:8].isdigit():
+        try:
+            return datetime.strptime(digits[:8], "%Y%m%d").date()
+        except ValueError:
+            return None
+    return None
+
+
+def _parse_education_period_date(value: Any) -> date | None:
+    """교육기간 → YYYY-MM-DD 날짜. 구간이면 앞쪽 날짜만. 실패 시 None."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    # 구간(2023.11.01~2023.11.30) → 앞쪽만
+    first = _RANGE_SPLIT_RE.split(text, maxsplit=1)[0].strip()
+    return _parse_single_date_text(first)
+
+
 class SettlementListItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -129,6 +176,7 @@ class SettlementListItem(BaseModel):
     client_name: str
     course_name: str
     education_period: str | None
+    education_period_date: date | None
     headcount: int | None
     base_tuition: Decimal | None
     net_sales: Decimal | None
@@ -146,6 +194,7 @@ class SettlementRead(BaseModel):
     client_name: str
     course_name: str
     education_period: str | None
+    education_period_date: date | None
     headcount: int | None
     base_tuition: Decimal | None
     textbook_fee: Decimal | None
@@ -195,6 +244,9 @@ def _row_to_fields(row_values: dict[str, Any]) -> dict[str, Any]:
             "client_name": client_name,
             "course_name": course_name,
             "education_period": _parse_str(row_values.get("education_period")),
+            "education_period_date": _parse_education_period_date(
+                row_values.get("education_period")
+            ),
             "headcount": _parse_int(row_values.get("headcount")),
             "base_tuition": _parse_decimal(row_values.get("base_tuition")),
             "textbook_fee": _parse_decimal(row_values.get("textbook_fee")),

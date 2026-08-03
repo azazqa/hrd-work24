@@ -10,6 +10,7 @@ export type SettlementListItem = {
   client_name: string;
   course_name: string;
   education_period: string | null;
+  education_period_date: string | null;
   headcount: number | null;
   base_tuition: string | number | null;
   net_sales: string | number | null;

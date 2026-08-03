@@ -1,4 +1,5 @@
 import io
+from datetime import date, datetime
 from decimal import Decimal
 
 import pytest
@@ -7,6 +8,7 @@ from openpyxl import Workbook
 from app.models import Settlement
 from app.routes.settlements import (
     _normalize_ym,
+    _parse_education_period_date,
     _parse_rate,
     _row_to_fields,
     _year_from_ym,
@@ -31,6 +33,18 @@ def test_parse_rate_percent_and_decimal():
     assert _parse_rate(None) is None
 
 
+def test_parse_education_period_date_formats():
+    assert _parse_education_period_date("2023.11.01~2023.11.30") == date(2023, 11, 1)
+    assert _parse_education_period_date("2023-09-01") == date(2023, 9, 1)
+    assert _parse_education_period_date("2023/09/01") == date(2023, 9, 1)
+    assert _parse_education_period_date("20230901") == date(2023, 9, 1)
+    assert _parse_education_period_date(date(2023, 9, 1)) == date(2023, 9, 1)
+    assert _parse_education_period_date(datetime(2023, 9, 1, 12, 0)) == date(2023, 9, 1)
+    assert _parse_education_period_date("not-a-date") is None
+    assert _parse_education_period_date(None) is None
+    assert _parse_education_period_date("") is None
+
+
 def test_row_to_fields_builds_purchase_year():
     fields = _row_to_fields(
         {
@@ -38,6 +52,7 @@ def test_row_to_fields_builds_purchase_year():
             "sales_ym": "202312",
             "client_name": "휴넷",
             "course_name": "테스트 과정",
+            "education_period": "2023.11.01~2023.11.30",
             "headcount": "1",
             "base_tuition": 1000,
             "share_rate": "30%",
@@ -50,6 +65,8 @@ def test_row_to_fields_builds_purchase_year():
     assert fields["client_name"] == "휴넷"
     assert fields["share_rate"] == Decimal("0.3")
     assert fields["settlement_rate"] == Decimal("0.25")
+    assert fields["education_period"] == "2023.11.01~2023.11.30"
+    assert fields["education_period_date"] == date(2023, 11, 1)
 
 
 def test_row_to_fields_requires_client_and_course():

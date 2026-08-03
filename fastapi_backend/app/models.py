@@ -5,6 +5,7 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     Column,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -162,6 +163,7 @@ class Settlement(Base):
     client_name = Column(String(255), nullable=False, index=True)
     course_name = Column(String(500), nullable=False, index=True)
     education_period = Column(String(100), nullable=True)
+    education_period_date = Column(Date, nullable=True)
     headcount = Column(Integer, nullable=True)
     base_tuition = Column(Numeric(18, 4), nullable=True)
     textbook_fee = Column(Numeric(18, 4), nullable=True)
