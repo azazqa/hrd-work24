@@ -10,49 +10,6 @@ from app.models import (
     SchedulerJobQueue,
     Settlement,
 )
-from app.routes.settlements import _build_compare_result, _classify_owned_course
-
-
-def test_build_compare_result_from_cache_rows():
-    mapping = {"훈련기관A": "고객사A"}
-    keys = {("고객사A", "과정1", date(2024, 1, 10))}
-    owned_rows = [
-        {
-            "institution_name": "훈련기관A",
-            "course_name": "과정1",
-            "tra_start_date": date(2024, 1, 10),
-            "tra_end_date": date(2024, 1, 20),
-            "reg_course_man": "3",
-        },
-        {
-            "institution_name": "훈련기관A",
-            "course_name": "과정2",
-            "tra_start_date": date(2024, 2, 1),
-            "tra_end_date": None,
-            "reg_course_man": "1",
-        },
-        {
-            "institution_name": "미맵핑기관",
-            "course_name": "과정3",
-            "tra_start_date": date(2024, 3, 1),
-            "tra_end_date": None,
-            "reg_course_man": None,
-        },
-    ]
-    extracted_at = datetime(2024, 6, 1, tzinfo=timezone.utc)
-    result = _build_compare_result(
-        year=2024,
-        owned_rows=owned_rows,
-        mapping=mapping,
-        settlement_keys=keys,
-        cache_hit=True,
-        extracted_at=extracted_at,
-    )
-    assert result.cache_hit is True
-    assert result.total == 3
-    assert result.matched == 1
-    assert result.unsettled == 1
-    assert result.unmapped == 1
 
 
 @pytest.mark.asyncio
@@ -104,6 +61,135 @@ async def test_compare_reads_cache_without_es(
     assert body["cache_hit"] is True
     assert body["matched"] == 1
     assert body["unsettled"] == 1
+    assert body["unmapped"] == 0
+    assert "items_matched" not in body
+
+    matched = await test_client.get(
+        "/settlements/compare-owned/items?year=2024&status=matched&page=1&size=50",
+        headers=headers,
+    )
+    assert matched.status_code == 200, matched.text
+    matched_body = matched.json()
+    assert matched_body["total"] == 1
+    assert matched_body["items"][0]["course_name"] == "과정매칭"
+    assert matched_body["items"][0]["client_name"] == "고객A"
+    assert matched_body["items"][0]["status"] == "matched"
+
+    unsettled = await test_client.get(
+        "/settlements/compare-owned/items?year=2024&status=unsettled&page=1&size=50",
+        headers=headers,
+    )
+    assert unsettled.status_code == 200, unsettled.text
+    unsettled_body = unsettled.json()
+    assert unsettled_body["total"] == 1
+    assert unsettled_body["items"][0]["course_name"] == "과정미정산"
+
+
+@pytest.mark.asyncio
+async def test_compare_auto_registers_identity_mapping(
+    test_client, authenticated_user, db_session
+):
+    headers = authenticated_user["headers"]
+    extracted_at = datetime.now(timezone.utc)
+    db_session.add(
+        OwnedCourseOpening(
+            year=2024,
+            institution_name="동일고객사",
+            course_name="과정자동",
+            tra_start_date=date(2024, 4, 1),
+            extracted_at=extracted_at,
+        )
+    )
+    db_session.add(
+        Settlement(
+            purchase_ym="202404",
+            purchase_year=2024,
+            client_name="동일고객사",
+            course_name="과정자동",
+            education_period_date=date(2024, 4, 1),
+        )
+    )
+    await db_session.commit()
+
+    before = (
+        await db_session.execute(
+            select(ClientNameMapping).where(
+                ClientNameMapping.institution_name == "동일고객사"
+            )
+        )
+    ).scalars().first()
+    assert before is None
+
+    res = await test_client.get(
+        "/settlements/compare-owned?year=2024",
+        headers=headers,
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["matched"] == 1
+    assert body["unmapped"] == 0
+
+    mapping = (
+        await db_session.execute(
+            select(ClientNameMapping).where(
+                ClientNameMapping.institution_name == "동일고객사",
+                ClientNameMapping.is_delete == False,  # noqa: E712
+            )
+        )
+    ).scalars().one()
+    assert mapping.client_name == "동일고객사"
+
+
+@pytest.mark.asyncio
+async def test_compare_does_not_revive_soft_deleted_mapping(
+    test_client, authenticated_user, db_session
+):
+    headers = authenticated_user["headers"]
+    extracted_at = datetime.now(timezone.utc)
+    db_session.add(
+        ClientNameMapping(
+            institution_name="삭제된기관",
+            client_name="삭제된기관",
+            is_delete=True,
+        )
+    )
+    db_session.add(
+        OwnedCourseOpening(
+            year=2024,
+            institution_name="삭제된기관",
+            course_name="과정",
+            tra_start_date=date(2024, 1, 1),
+            extracted_at=extracted_at,
+        )
+    )
+    db_session.add(
+        Settlement(
+            purchase_ym="202401",
+            purchase_year=2024,
+            client_name="삭제된기관",
+            course_name="과정",
+            education_period_date=date(2024, 1, 1),
+        )
+    )
+    await db_session.commit()
+
+    res = await test_client.get(
+        "/settlements/compare-owned?year=2024",
+        headers=headers,
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["unmapped"] == 1
+    assert body["matched"] == 0
+
+    mapping = (
+        await db_session.execute(
+            select(ClientNameMapping).where(
+                ClientNameMapping.institution_name == "삭제된기관"
+            )
+        )
+    ).scalars().one()
+    assert mapping.is_delete is True
 
 
 @pytest.mark.asyncio
@@ -207,15 +293,3 @@ async def test_extract_replaces_year_cache(db_session):
     assert len(rows_2024) == 1
     assert rows_2024[0].course_name == "신과정"
     assert rows_2024[0].institution_name == "신기관"
-
-
-def test_classify_owned_course_still_works():
-    status, client = _classify_owned_course(
-        institution_name="X",
-        course_name="C",
-        tra_start_date=date(2024, 1, 1),
-        mapping={},
-        settlement_keys=set(),
-    )
-    assert status == "unmapped"
-    assert client is None

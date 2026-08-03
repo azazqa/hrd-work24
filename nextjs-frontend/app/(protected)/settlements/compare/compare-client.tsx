@@ -9,8 +9,11 @@ import {
   fetchOwnedCourseOpeningRefreshJob,
   refreshOwnedCourseOpenings,
   type OwnedSettlementCompareItem,
+  type OwnedSettlementCompareItemsPage,
   type OwnedSettlementCompareResult,
+  type OwnedSettlementCompareStatus,
 } from "@/components/actions/settlements-action";
+import { PagePagination } from "@/components/page-pagination";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -41,7 +44,11 @@ import { formatDateTimeInSeoul, getSettlementCompareYearOptions } from "@/lib/da
 
 type Props = {
   year?: number;
+  tab: OwnedSettlementCompareStatus;
+  page: number;
+  size: number;
   result?: OwnedSettlementCompareResult | null;
+  itemsPage?: OwnedSettlementCompareItemsPage | null;
   error?: string | null;
 };
 
@@ -109,7 +116,15 @@ function CompareTable({
   );
 }
 
-export function CompareOwnedClient({ year, result, error }: Props) {
+export function CompareOwnedClient({
+  year,
+  tab,
+  page,
+  size,
+  result,
+  itemsPage,
+  error,
+}: Props) {
   const router = useRouter();
   const yearOptions = useMemo(() => getSettlementCompareYearOptions(), []);
   const defaultYear = yearOptions[0] ?? new Date().getFullYear();
@@ -134,13 +149,40 @@ export function CompareOwnedClient({ year, result, error }: Props) {
     ];
   }, [result]);
 
+  const buildCompareUrl = (
+    next: {
+      year?: number;
+      tab?: OwnedSettlementCompareStatus;
+      page?: number;
+      size?: number;
+    },
+  ) => {
+    const y = next.year ?? year ?? Number(yearInput);
+    const t = next.tab ?? tab;
+    const p = next.page ?? 1;
+    const s = next.size ?? size;
+    const q = new URLSearchParams();
+    q.set("year", String(y));
+    q.set("tab", t);
+    q.set("page", String(p));
+    q.set("size", String(s));
+    return `/settlements/compare?${q.toString()}`;
+  };
+
   const onSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const y = Number(yearInput);
     if (!yearOptions.includes(y)) return;
     setRefreshError(null);
     setRefreshMessage(null);
-    router.push(`/settlements/compare?year=${y}`);
+    router.push(buildCompareUrl({ year: y, tab: "unsettled", page: 1 }));
+  };
+
+  const onTabChange = (value: string) => {
+    const next = value as OwnedSettlementCompareStatus;
+    if (!yearOptions.includes(Number(yearInput)) && year == null) return;
+    const y = year ?? Number(yearInput);
+    router.push(buildCompareUrl({ year: y, tab: next, page: 1 }));
   };
 
   const onRefresh = async () => {
@@ -194,7 +236,7 @@ export function CompareOwnedClient({ year, result, error }: Props) {
     setRefreshMessage(
       `${job.year}년 개설 보유과정 ${(job.row_count ?? 0).toLocaleString()}건을 추출했습니다.`,
     );
-    router.push(`/settlements/compare?year=${y}`);
+    router.push(buildCompareUrl({ year: y, tab, page: 1 }));
     router.refresh();
   };
 
@@ -215,6 +257,12 @@ export function CompareOwnedClient({ year, result, error }: Props) {
     setClientName("");
     router.refresh();
   };
+
+  const items = itemsPage?.items ?? [];
+  const totalItems = itemsPage?.total ?? 0;
+  const totalPages = Math.max(1, itemsPage?.pages ?? 1);
+  const paginationExtra =
+    year != null ? `year=${year}&tab=${tab}` : undefined;
 
   return (
     <div className="space-y-6">
@@ -281,7 +329,7 @@ export function CompareOwnedClient({ year, result, error }: Props) {
       ) : null}
 
       {result?.cache_hit ? (
-        <Tabs defaultValue="unsettled">
+        <Tabs value={tab} onValueChange={onTabChange}>
           <TabsList>
             <TabsTrigger value="unsettled">
               미정산 ({result.unsettled})
@@ -291,22 +339,30 @@ export function CompareOwnedClient({ year, result, error }: Props) {
             </TabsTrigger>
             <TabsTrigger value="matched">정산됨 ({result.matched})</TabsTrigger>
           </TabsList>
-          <TabsContent value="unsettled" className="mt-4">
-            <CompareTable items={result.items_unsettled} showClient />
-          </TabsContent>
-          <TabsContent value="unmapped" className="mt-4">
+          <TabsContent value={tab} className="mt-4 space-y-2">
             <CompareTable
-              items={result.items_unmapped}
-              showClient={false}
-              onAddMapping={(name) => {
-                setMapInst(name);
-                setClientName("");
-                setMapError(null);
-              }}
+              items={items}
+              showClient={tab !== "unmapped"}
+              onAddMapping={
+                tab === "unmapped"
+                  ? (name) => {
+                      setMapInst(name);
+                      setClientName("");
+                      setMapError(null);
+                    }
+                  : undefined
+              }
             />
-          </TabsContent>
-          <TabsContent value="matched" className="mt-4">
-            <CompareTable items={result.items_matched} showClient />
+            {totalItems > 0 ? (
+              <PagePagination
+                currentPage={page}
+                totalPages={totalPages}
+                pageSize={size}
+                totalItems={totalItems}
+                basePath="/settlements/compare"
+                extraQuery={paginationExtra}
+              />
+            ) : null}
           </TabsContent>
         </Tabs>
       ) : !error && year == null ? (

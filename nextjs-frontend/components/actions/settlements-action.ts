@@ -42,6 +42,9 @@ export type OwnedSettlementCompareItem = {
   status: "matched" | "unsettled" | "unmapped";
 };
 
+export type OwnedSettlementCompareStatus =
+  OwnedSettlementCompareItem["status"];
+
 export type OwnedSettlementCompareResult = {
   year: number;
   total: number;
@@ -50,9 +53,14 @@ export type OwnedSettlementCompareResult = {
   unmapped: number;
   cache_hit: boolean;
   extracted_at: string | null;
-  items_matched: OwnedSettlementCompareItem[];
-  items_unsettled: OwnedSettlementCompareItem[];
-  items_unmapped: OwnedSettlementCompareItem[];
+};
+
+export type OwnedSettlementCompareItemsPage = {
+  items: OwnedSettlementCompareItem[];
+  total?: number | null;
+  page?: number | null;
+  size?: number | null;
+  pages?: number | null;
 };
 
 export type OwnedOpeningExtractQueue = {
@@ -146,6 +154,46 @@ export async function compareOwnedSettlements(
   }
 
   return (await res.json()) as OwnedSettlementCompareResult;
+}
+
+export async function fetchCompareOwnedItems(
+  year: number,
+  status: OwnedSettlementCompareStatus,
+  page: number,
+  size: number,
+): Promise<OwnedSettlementCompareItemsPage | { message: string }> {
+  const baseURL = process.env.API_BASE_URL;
+  if (!baseURL) {
+    return { message: "API_BASE_URL is not configured" };
+  }
+
+  const token = await requireAccessToken();
+  const q = new URLSearchParams();
+  q.set("year", String(year));
+  q.set("status", status);
+  q.set("page", String(page));
+  q.set("size", String(size));
+
+  const res = await fetch(
+    `${baseURL}/settlements/compare-owned/items?${q.toString()}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    },
+  );
+
+  if (!res.ok) {
+    let message = `비교 목록 조회에 실패했습니다. (HTTP ${res.status})`;
+    try {
+      const body = (await res.json()) as { detail?: unknown };
+      message = formatApiError(body.detail) || message;
+    } catch {
+      /* ignore */
+    }
+    return { message };
+  }
+
+  return (await res.json()) as OwnedSettlementCompareItemsPage;
 }
 
 export async function refreshOwnedCourseOpenings(

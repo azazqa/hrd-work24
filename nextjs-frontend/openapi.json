@@ -2630,6 +2630,100 @@
         }
       }
     },
+    "/settlements/compare-owned/items": {
+      "get": {
+        "tags": [
+          "settlements"
+        ],
+        "summary": "List Owned Settlement Compare Items",
+        "operationId": "list_owned_settlement_compare_items",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "year",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 2100,
+              "minimum": 2000,
+              "description": "\ube44\uad50 \uc5f0\ub3c4",
+              "title": "Year"
+            },
+            "description": "\ube44\uad50 \uc5f0\ub3c4"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "matched",
+                "unsettled",
+                "unmapped"
+              ],
+              "type": "string",
+              "description": "\ud0ed \uc0c1\ud0dc",
+              "title": "Status"
+            },
+            "description": "\ud0ed \uc0c1\ud0dc"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Page size",
+              "default": 50,
+              "title": "Size"
+            },
+            "description": "Page size"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_OwnedSettlementCompareItem_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/client-mappings": {
       "get": {
         "tags": [
@@ -4505,27 +4599,6 @@
               }
             ],
             "title": "Extracted At"
-          },
-          "items_matched": {
-            "items": {
-              "$ref": "#/components/schemas/OwnedSettlementCompareItem"
-            },
-            "type": "array",
-            "title": "Items Matched"
-          },
-          "items_unsettled": {
-            "items": {
-              "$ref": "#/components/schemas/OwnedSettlementCompareItem"
-            },
-            "type": "array",
-            "title": "Items Unsettled"
-          },
-          "items_unmapped": {
-            "items": {
-              "$ref": "#/components/schemas/OwnedSettlementCompareItem"
-            },
-            "type": "array",
-            "title": "Items Unmapped"
           }
         },
         "type": "object",
@@ -4536,7 +4609,8 @@
           "unsettled",
           "unmapped"
         ],
-        "title": "OwnedSettlementCompareResult"
+        "title": "OwnedSettlementCompareResult",
+        "description": "\ube44\uad50 \uc694\uc57d (\ubaa9\ub85d\uc740 /compare-owned/items)."
       },
       "Page_ClientNameMappingRead_": {
         "properties": {
@@ -4735,6 +4809,72 @@
           "size"
         ],
         "title": "Page[OwnedCourseListItem]"
+      },
+      "Page_OwnedSettlementCompareItem_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OwnedSettlementCompareItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "size"
+        ],
+        "title": "Page[OwnedSettlementCompareItem]"
       },
       "Page_SchedulerJobLogRead_": {
         "properties": {
