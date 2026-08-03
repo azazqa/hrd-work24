@@ -291,6 +291,16 @@ export function CompareOwnedClient({
         >
           {refreshing ? "추출 중…" : "추출/갱신"}
         </Button>
+        {result?.cache_hit && year != null ? (
+          <Button type="button" variant="outline" asChild>
+            <a
+              href={`/api/settlements/compare-owned/export?year=${year}`}
+              download
+            >
+              내보내기
+            </a>
+          </Button>
+        ) : null}
         <Button type="button" variant="outline" asChild>
           <Link href="/settlements/mappings">고객사 맵핑 관리</Link>
         </Button>

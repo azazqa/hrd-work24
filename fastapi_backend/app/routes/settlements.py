@@ -990,3 +990,145 @@ async def list_owned_settlement_compare_items(
         )
     )
     return await apaginate(session, stmt, params, transformer=_transform_compare_items)
+
+
+_COMPARE_EXPORT_HEADERS = [
+    "훈련기관명",
+    "고객사명",
+    "과정명",
+    "훈련시작일",
+    "훈련종료일",
+    "수강신청 인원",
+]
+
+_COMPARE_STATUS_SHEETS: list[tuple[CompareStatus, str]] = [
+    ("unsettled", "미정산"),
+    ("unmapped", "맵핑없음"),
+    ("matched", "정산됨"),
+]
+
+
+def _append_compare_rows(ws, rows: list[Any]) -> None:
+    ws.append(list(_COMPARE_EXPORT_HEADERS))
+    for row in rows:
+        ws.append(
+            [
+                row.institution_name,
+                row.client_name,
+                row.course_name,
+                _format_date_cell(row.tra_start_date),
+                _format_date_cell(row.tra_end_date),
+                row.reg_course_man,
+            ]
+        )
+
+
+@router.get("/compare-owned/export")
+async def export_owned_settlement_compare(
+    year: int = Query(..., ge=2000, le=2100, description="비교 연도"),
+    session: AsyncSession = Depends(get_async_session),
+    _: User = Depends(current_active_user),
+):
+    """비교 결과 전체(요약 + 미정산/맵핑없음/정산됨)를 시트별 xlsx로 내보낸다."""
+    await _auto_register_identity_mappings(session, year)
+
+    extracted_at = await session.scalar(
+        select(func.max(OwnedCourseOpening.extracted_at)).where(
+            OwnedCourseOpening.is_delete == False,  # noqa: E712
+            OwnedCourseOpening.year == year,
+        )
+    )
+    if extracted_at is None:
+        raise HTTPException(
+            status_code=404,
+            detail="해당 연도 추출 캐시가 없습니다. 먼저 추출/갱신을 실행하세요.",
+        )
+
+    status_expr = _compare_status_expr()
+    counts = (
+        await session.execute(
+            select(
+                func.count().label("total"),
+                func.coalesce(
+                    func.sum(case((status_expr == "matched", 1), else_=0)), 0
+                ).label("matched"),
+                func.coalesce(
+                    func.sum(case((status_expr == "unsettled", 1), else_=0)), 0
+                ).label("unsettled"),
+                func.coalesce(
+                    func.sum(case((status_expr == "unmapped", 1), else_=0)), 0
+                ).label("unmapped"),
+            )
+            .select_from(OwnedCourseOpening)
+            .outerjoin(
+                ClientNameMapping,
+                and_(
+                    ClientNameMapping.institution_name
+                    == func.trim(OwnedCourseOpening.institution_name),
+                    ClientNameMapping.is_delete == False,  # noqa: E712
+                ),
+            )
+            .where(
+                OwnedCourseOpening.is_delete == False,  # noqa: E712
+                OwnedCourseOpening.year == year,
+            )
+        )
+    ).one()
+
+    total = int(counts.total or 0)
+    if total > MAX_EXPORT_ROWS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"내보낼 데이터가 {MAX_EXPORT_ROWS:,}건을 초과합니다.",
+        )
+
+    all_rows = (
+        await session.execute(
+            _compare_base_stmt(year).order_by(
+                OwnedCourseOpening.institution_name.asc().nulls_last(),
+                OwnedCourseOpening.course_name.asc().nulls_last(),
+                OwnedCourseOpening.tra_start_date.asc().nulls_last(),
+                OwnedCourseOpening.id.asc(),
+            )
+        )
+    ).all()
+
+    by_status: dict[str, list[Any]] = {
+        "matched": [],
+        "unsettled": [],
+        "unmapped": [],
+    }
+    for row in all_rows:
+        by_status.setdefault(row.status, []).append(row)
+
+    wb = Workbook()
+    ws_summary = wb.active
+    ws_summary.title = "요약"
+    ws_summary.append(["항목", "값"])
+    ws_summary.append(["연도", year])
+    ws_summary.append(["전체", total])
+    ws_summary.append(["정산됨", int(counts.matched or 0)])
+    ws_summary.append(["미정산", int(counts.unsettled or 0)])
+    ws_summary.append(["맵핑 없음", int(counts.unmapped or 0)])
+    ws_summary.append(
+        [
+            "추출일시",
+            extracted_at.isoformat() if extracted_at is not None else None,
+        ]
+    )
+
+    for status_key, sheet_name in _COMPARE_STATUS_SHEETS:
+        ws = wb.create_sheet(sheet_name)
+        _append_compare_rows(ws, by_status.get(status_key, []))
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    filename = f"owned_settlement_compare_{year}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        },
+    )

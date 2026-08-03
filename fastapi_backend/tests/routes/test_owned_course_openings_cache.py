@@ -84,6 +84,30 @@ async def test_compare_reads_cache_without_es(
     assert unsettled_body["total"] == 1
     assert unsettled_body["items"][0]["course_name"] == "과정미정산"
 
+    export_res = await test_client.get(
+        "/settlements/compare-owned/export?year=2024",
+        headers=headers,
+    )
+    assert export_res.status_code == 200, export_res.text
+    assert (
+        "spreadsheetml"
+        in (export_res.headers.get("content-type") or "")
+    )
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    wb = load_workbook(BytesIO(export_res.content))
+    assert wb.sheetnames == ["요약", "미정산", "맵핑없음", "정산됨"]
+    assert wb["요약"]["B2"].value == 2024
+    assert wb["요약"]["B3"].value == 2
+    assert wb["미정산"].max_row == 2
+    assert wb["미정산"]["C2"].value == "과정미정산"
+    assert wb["정산됨"].max_row == 2
+    assert wb["정산됨"]["C2"].value == "과정매칭"
+    assert wb["맵핑없음"].max_row == 1  # header only
+    wb.close()
+
 
 @pytest.mark.asyncio
 async def test_compare_auto_registers_identity_mapping(
