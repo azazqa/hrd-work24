@@ -5,6 +5,7 @@ from fastapi_pagination import add_pagination
 from app.config import settings
 from app.routes.admin_scheduler import router as admin_scheduler_router
 from app.routes.auth_refresh import router as auth_refresh_router
+from app.routes.client_mappings import router as client_mappings_router
 from app.routes.courses import router as courses_router
 from app.routes.owned_courses import router as owned_courses_router
 from app.routes.settlements import router as settlements_router
@@ -70,6 +71,12 @@ app.include_router(
     settlements_router,
     prefix="/settlements",
     tags=["settlements"],
+)
+
+app.include_router(
+    client_mappings_router,
+    prefix="/client-mappings",
+    tags=["client-mappings"],
 )
 
 app.include_router(

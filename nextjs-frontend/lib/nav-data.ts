@@ -33,7 +33,21 @@ export const navMain: NavItem[] = [
     title: "정산",
     url: "/settlements",
     icon: Calculator,
-    hasChildren: false,
+    hasChildren: true,
+    items: [
+      {
+        title: "정산 목록",
+        url: "/settlements",
+      },
+      {
+        title: "고객사 맵핑",
+        url: "/settlements/mappings",
+      },
+      {
+        title: "보유과정 비교",
+        url: "/settlements/compare",
+      },
+    ],
   },
   {
     title: "관리자",

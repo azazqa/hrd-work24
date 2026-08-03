@@ -7,6 +7,8 @@ from openpyxl import Workbook
 
 from app.models import Settlement
 from app.routes.settlements import (
+    _classify_owned_course,
+    _normalize_compare_date,
     _normalize_ym,
     _parse_education_period_date,
     _parse_rate,
@@ -98,6 +100,49 @@ def test_row_to_fields_builds_purchase_year():
     assert fields["settlement_rate"] == Decimal("0.25")
     assert fields["education_period"] == "2023.11.01~2023.11.30"
     assert fields["education_period_date"] == date(2023, 11, 1)
+
+
+def test_classify_owned_course_statuses():
+    mapping = {"훈련기관A": "고객사A"}
+    keys = {("고객사A", "과정1", date(2024, 1, 10))}
+
+    status, client = _classify_owned_course(
+        institution_name="훈련기관A",
+        course_name="과정1",
+        tra_start_date=date(2024, 1, 10),
+        mapping=mapping,
+        settlement_keys=keys,
+    )
+    assert status == "matched"
+    assert client == "고객사A"
+
+    status, client = _classify_owned_course(
+        institution_name="훈련기관A",
+        course_name="과정1",
+        tra_start_date=date(2024, 2, 1),
+        mapping=mapping,
+        settlement_keys=keys,
+    )
+    assert status == "unsettled"
+    assert client == "고객사A"
+
+    status, client = _classify_owned_course(
+        institution_name="없는기관",
+        course_name="과정1",
+        tra_start_date=date(2024, 1, 10),
+        mapping=mapping,
+        settlement_keys=keys,
+    )
+    assert status == "unmapped"
+    assert client is None
+
+
+def test_normalize_compare_date():
+    assert _normalize_compare_date("2023-11-17") == date(2023, 11, 17)
+    assert _normalize_compare_date("20231117") == date(2023, 11, 17)
+    assert _normalize_compare_date("2023.11.17") == date(2023, 11, 17)
+    assert _normalize_compare_date(None) is None
+    assert _normalize_compare_date("") is None
 
 
 def test_row_to_fields_requires_client_and_course():

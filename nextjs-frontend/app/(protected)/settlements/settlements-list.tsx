@@ -15,7 +15,21 @@ export function SettlementsListHeader() {
   return (
     <div className="mb-4 flex items-center justify-between flex-wrap gap-2">
       <h2 className="text-xl font-semibold">정산 목록</h2>
-      <ExcelImportDialog />
+      <div className="flex flex-wrap gap-2">
+        <a
+          href="/settlements/compare"
+          className="inline-flex h-9 items-center rounded-md border px-3 text-sm hover:bg-muted"
+        >
+          보유과정 비교
+        </a>
+        <a
+          href="/settlements/mappings"
+          className="inline-flex h-9 items-center rounded-md border px-3 text-sm hover:bg-muted"
+        >
+          고객사 맵핑
+        </a>
+        <ExcelImportDialog />
+      </div>
     </div>
   );
 }

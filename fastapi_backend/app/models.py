@@ -176,6 +176,16 @@ class Settlement(Base):
     sales_rep = Column(String(100), nullable=True)
 
 
+class ClientNameMapping(Base):
+    """훈련기관명(Work24 instNm) → 정산 고객사명 맵핑."""
+
+    __tablename__ = "client_name_mappings"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    institution_name = Column(String(255), nullable=False, unique=True, index=True)
+    client_name = Column(String(255), nullable=False, index=True)
+
+
 class Work24ApiLog(Base):
     """Work24 Open API 호출 이력 (headers only)."""
 

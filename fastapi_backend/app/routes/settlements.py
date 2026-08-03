@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import io
+import logging
 import re
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
@@ -14,10 +15,23 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_async_session
-from app.models import Settlement, User
+from app.es import get_es
+from app.models import ClientNameMapping, Settlement, User
 from app.pagination import MAX_PAGE_SIZE, Page, Params
+from app.routes.courses import (
+    MAX_EXPORT_ROWS,
+    SCROLL_BATCH_SIZE,
+    SCROLL_KEEPALIVE,
+    _build_owned_scroll_body,
+    _clear_scroll_safe,
+    _load_active_owned_names,
+    _parse_course_from_es,
+)
 from app.users import current_active_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -477,4 +491,218 @@ async def import_settlements(
     wb.close()
     return SettlementImportResult(
         deleted=deleted, created=created, failed=failed, errors=errors
+    )
+
+
+class OwnedSettlementCompareItem(BaseModel):
+    institution_name: str | None = None
+    client_name: str | None = None
+    course_name: str | None = None
+    tra_start_date: str | None = None
+    tra_end_date: str | None = None
+    reg_course_man: str | None = None
+    status: Literal["matched", "unsettled", "unmapped"]
+
+
+class OwnedSettlementCompareResult(BaseModel):
+    year: int
+    total: int
+    matched: int
+    unsettled: int
+    unmapped: int
+    items_matched: list[OwnedSettlementCompareItem] = Field(default_factory=list)
+    items_unsettled: list[OwnedSettlementCompareItem] = Field(default_factory=list)
+    items_unmapped: list[OwnedSettlementCompareItem] = Field(default_factory=list)
+
+
+def _normalize_compare_date(value: Any) -> date | None:
+    """ES traStartDate / 문자열 → date."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    text = str(value).strip().replace(".", "-").replace("/", "-")
+    if not text:
+        return None
+    digits = re.sub(r"\D+", "", text)
+    if len(digits) >= 8 and digits[:8].isdigit():
+        try:
+            return date(int(digits[:4]), int(digits[4:6]), int(digits[6:8]))
+        except ValueError:
+            return None
+    try:
+        return datetime.strptime(text[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _classify_owned_course(
+    *,
+    institution_name: str | None,
+    course_name: str | None,
+    tra_start_date: date | None,
+    mapping: dict[str, str],
+    settlement_keys: set[tuple[str, str, date]],
+) -> tuple[Literal["matched", "unsettled", "unmapped"], str | None]:
+    """개설 보유과정 1건을 비교 분류. (status, mapped_client_name)."""
+    inst = (institution_name or "").strip()
+    course = (course_name or "").strip()
+    if not inst or inst not in mapping:
+        return "unmapped", None
+
+    client = mapping[inst]
+    if tra_start_date is None or not course:
+        return "unsettled", client
+
+    key = (client, course, tra_start_date)
+    if key in settlement_keys:
+        return "matched", client
+    return "unsettled", client
+
+
+async def _scroll_owned_courses(es, body: dict) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    scroll_id: str | None = None
+    try:
+        response = await es.search(
+            index=settings.ES_COURSE_INDEX,
+            body=body,
+            scroll=SCROLL_KEEPALIVE,
+        )
+        scroll_id = response.get("_scroll_id")
+        total_raw = response.get("hits", {}).get("total")
+        if isinstance(total_raw, dict):
+            total_count = int(total_raw.get("value", 0))
+        else:
+            total_count = int(total_raw or 0)
+        if total_count > MAX_EXPORT_ROWS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"비교 대상이 {MAX_EXPORT_ROWS:,}건을 초과합니다. 조건을 좁혀 주세요.",
+            )
+
+        while True:
+            hits = response.get("hits", {}).get("hits", [])
+            if not hits:
+                break
+            for hit in hits:
+                if len(rows) >= MAX_EXPORT_ROWS:
+                    break
+                item = _parse_course_from_es(hit.get("_source", {}))
+                rows.append(
+                    {
+                        "institution_name": item.inst_name,
+                        "course_name": item.course_name,
+                        "tra_start_date": item.tra_start_date,
+                        "tra_end_date": item.tra_end_date,
+                        "reg_course_man": item.reg_course_man,
+                    }
+                )
+            if len(rows) >= MAX_EXPORT_ROWS or len(hits) < SCROLL_BATCH_SIZE:
+                break
+            response = await es.scroll(scroll_id=scroll_id, scroll=SCROLL_KEEPALIVE)
+    finally:
+        await _clear_scroll_safe(es, scroll_id)
+    return rows
+
+
+@router.get("/compare-owned", response_model=OwnedSettlementCompareResult)
+async def compare_owned_with_settlements(
+    year: int = Query(..., ge=2000, le=2100, description="비교 연도(훈련시작일/교육기간)"),
+    min_score: float = Query(default=0, ge=0, description="보유과정 ES 매칭 min_score"),
+    session: AsyncSession = Depends(get_async_session),
+    _: User = Depends(current_active_user),
+):
+    names = await _load_active_owned_names(session)
+    owned_rows: list[dict[str, Any]] = []
+    if names:
+        body = _build_owned_scroll_body(names, year, min_score, False)
+        es = get_es()
+        try:
+            owned_rows = await _scroll_owned_courses(es, body)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.exception("Elasticsearch owned scroll failed for year=%s", year)
+            raise HTTPException(
+                status_code=502, detail=f"과정 검색에 실패했습니다: {exc}"
+            ) from exc
+
+    mapping_rows = (
+        await session.execute(
+            select(ClientNameMapping).where(
+                ClientNameMapping.is_delete == False  # noqa: E712
+            )
+        )
+    ).scalars().all()
+    mapping = {
+        (row.institution_name or "").strip(): (row.client_name or "").strip()
+        for row in mapping_rows
+        if (row.institution_name or "").strip() and (row.client_name or "").strip()
+    }
+
+    year_start = date(year, 1, 1)
+    year_end = date(year, 12, 31)
+    settlement_rows = (
+        await session.execute(
+            select(
+                Settlement.client_name,
+                Settlement.course_name,
+                Settlement.education_period_date,
+            ).where(
+                Settlement.is_delete == False,  # noqa: E712
+                Settlement.education_period_date.is_not(None),
+                Settlement.education_period_date >= year_start,
+                Settlement.education_period_date <= year_end,
+            )
+        )
+    ).all()
+    settlement_keys: set[tuple[str, str, date]] = set()
+    for client_name, course_name, ep_date in settlement_rows:
+        if ep_date is None:
+            continue
+        settlement_keys.add(
+            ((client_name or "").strip(), (course_name or "").strip(), ep_date)
+        )
+
+    items_matched: list[OwnedSettlementCompareItem] = []
+    items_unsettled: list[OwnedSettlementCompareItem] = []
+    items_unmapped: list[OwnedSettlementCompareItem] = []
+
+    for row in owned_rows:
+        start_date = _normalize_compare_date(row.get("tra_start_date"))
+        status, mapped_client = _classify_owned_course(
+            institution_name=row.get("institution_name"),
+            course_name=row.get("course_name"),
+            tra_start_date=start_date,
+            mapping=mapping,
+            settlement_keys=settlement_keys,
+        )
+        item = OwnedSettlementCompareItem(
+            institution_name=row.get("institution_name"),
+            client_name=mapped_client,
+            course_name=row.get("course_name"),
+            tra_start_date=row.get("tra_start_date"),
+            tra_end_date=row.get("tra_end_date"),
+            reg_course_man=row.get("reg_course_man"),
+            status=status,
+        )
+        if status == "matched":
+            items_matched.append(item)
+        elif status == "unsettled":
+            items_unsettled.append(item)
+        else:
+            items_unmapped.append(item)
+
+    return OwnedSettlementCompareResult(
+        year=year,
+        total=len(owned_rows),
+        matched=len(items_matched),
+        unsettled=len(items_unsettled),
+        unmapped=len(items_unmapped),
+        items_matched=items_matched,
+        items_unsettled=items_unsettled,
+        items_unmapped=items_unmapped,
     )

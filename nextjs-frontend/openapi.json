@@ -2467,6 +2467,292 @@
         ]
       }
     },
+    "/settlements/compare-owned": {
+      "get": {
+        "tags": [
+          "settlements"
+        ],
+        "summary": "Compare Owned With Settlements",
+        "operationId": "compare_owned_with_settlements",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "year",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 2100,
+              "minimum": 2000,
+              "description": "\ube44\uad50 \uc5f0\ub3c4(\ud6c8\ub828\uc2dc\uc791\uc77c/\uad50\uc721\uae30\uac04)",
+              "title": "Year"
+            },
+            "description": "\ube44\uad50 \uc5f0\ub3c4(\ud6c8\ub828\uc2dc\uc791\uc77c/\uad50\uc721\uae30\uac04)"
+          },
+          {
+            "name": "min_score",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": 0.0,
+              "description": "\ubcf4\uc720\uacfc\uc815 ES \ub9e4\uce6d min_score",
+              "default": 0,
+              "title": "Min Score"
+            },
+            "description": "\ubcf4\uc720\uacfc\uc815 ES \ub9e4\uce6d min_score"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnedSettlementCompareResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/client-mappings": {
+      "get": {
+        "tags": [
+          "client-mappings"
+        ],
+        "summary": "List Client Mappings",
+        "operationId": "list_client_mappings",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Page size",
+              "default": 50,
+              "title": "Size"
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "\ud6c8\ub828\uae30\uad00\uba85/\uace0\uac1d\uc0ac \uac80\uc0c9",
+              "title": "Q"
+            },
+            "description": "\ud6c8\ub828\uae30\uad00\uba85/\uace0\uac1d\uc0ac \uac80\uc0c9"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ClientNameMappingRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "client-mappings"
+        ],
+        "summary": "Create Client Mapping",
+        "operationId": "create_client_mapping",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientNameMappingCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientNameMappingRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/client-mappings/{mapping_id}": {
+      "put": {
+        "tags": [
+          "client-mappings"
+        ],
+        "summary": "Update Client Mapping",
+        "operationId": "update_client_mapping",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mapping_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mapping Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientNameMappingUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientNameMappingRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "client-mappings"
+        ],
+        "summary": "Delete Client Mapping",
+        "operationId": "delete_client_mapping",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mapping_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Mapping Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/admin/work24-api-logs": {
       "get": {
         "tags": [
@@ -2697,6 +2983,95 @@
           "file"
         ],
         "title": "Body_settlements-import_settlements"
+      },
+      "ClientNameMappingCreate": {
+        "properties": {
+          "institution_name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Institution Name"
+          },
+          "client_name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Client Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "institution_name",
+          "client_name"
+        ],
+        "title": "ClientNameMappingCreate"
+      },
+      "ClientNameMappingRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "institution_name": {
+            "type": "string",
+            "title": "Institution Name"
+          },
+          "client_name": {
+            "type": "string",
+            "title": "Client Name"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "institution_name",
+          "client_name",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ClientNameMappingRead"
+      },
+      "ClientNameMappingUpdate": {
+        "properties": {
+          "institution_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Institution Name"
+          },
+          "client_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Name"
+          }
+        },
+        "type": "object",
+        "title": "ClientNameMappingUpdate"
       },
       "CourseExportJobCreate": {
         "properties": {
@@ -3839,6 +4214,210 @@
         },
         "type": "object",
         "title": "OwnedCourseUpdate"
+      },
+      "OwnedSettlementCompareItem": {
+        "properties": {
+          "institution_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Institution Name"
+          },
+          "client_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Name"
+          },
+          "course_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Course Name"
+          },
+          "tra_start_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tra Start Date"
+          },
+          "tra_end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tra End Date"
+          },
+          "reg_course_man": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reg Course Man"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "matched",
+              "unsettled",
+              "unmapped"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "OwnedSettlementCompareItem"
+      },
+      "OwnedSettlementCompareResult": {
+        "properties": {
+          "year": {
+            "type": "integer",
+            "title": "Year"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "matched": {
+            "type": "integer",
+            "title": "Matched"
+          },
+          "unsettled": {
+            "type": "integer",
+            "title": "Unsettled"
+          },
+          "unmapped": {
+            "type": "integer",
+            "title": "Unmapped"
+          },
+          "items_matched": {
+            "items": {
+              "$ref": "#/components/schemas/OwnedSettlementCompareItem"
+            },
+            "type": "array",
+            "title": "Items Matched"
+          },
+          "items_unsettled": {
+            "items": {
+              "$ref": "#/components/schemas/OwnedSettlementCompareItem"
+            },
+            "type": "array",
+            "title": "Items Unsettled"
+          },
+          "items_unmapped": {
+            "items": {
+              "$ref": "#/components/schemas/OwnedSettlementCompareItem"
+            },
+            "type": "array",
+            "title": "Items Unmapped"
+          }
+        },
+        "type": "object",
+        "required": [
+          "year",
+          "total",
+          "matched",
+          "unsettled",
+          "unmapped"
+        ],
+        "title": "OwnedSettlementCompareResult"
+      },
+      "Page_ClientNameMappingRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ClientNameMappingRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "size"
+        ],
+        "title": "Page[ClientNameMappingRead]"
       },
       "Page_CourseExportJobRead_": {
         "properties": {
