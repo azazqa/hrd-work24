@@ -150,6 +150,30 @@ class CourseExportJob(Base):
     )
 
 
+class Settlement(Base):
+    """정산 데이터 (엑셀 년도별 교체 import)."""
+
+    __tablename__ = "settlements"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    purchase_ym = Column(String(6), nullable=False)
+    purchase_year = Column(Integer, nullable=False, index=True)
+    sales_ym = Column(String(6), nullable=True)
+    client_name = Column(String(255), nullable=False, index=True)
+    course_name = Column(String(500), nullable=False, index=True)
+    education_period = Column(String(100), nullable=True)
+    headcount = Column(Integer, nullable=True)
+    base_tuition = Column(Numeric(18, 4), nullable=True)
+    textbook_fee = Column(Numeric(18, 4), nullable=True)
+    exclude_amount = Column(Numeric(18, 4), nullable=True)
+    share_rate = Column(Numeric(10, 6), nullable=True)
+    net_sales = Column(Numeric(18, 4), nullable=True)
+    settlement_rate = Column(Numeric(10, 6), nullable=True)
+    settlement_amount = Column(Numeric(18, 4), nullable=True)
+    note = Column(Text, nullable=True)
+    sales_rep = Column(String(100), nullable=True)
+
+
 class Work24ApiLog(Base):
     """Work24 Open API 호출 이력 (headers only)."""
 
