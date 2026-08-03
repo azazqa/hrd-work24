@@ -11,11 +11,17 @@ from scheduler.db import build_scheduler_engine
 from scheduler.jobs.course_export import run_course_export
 from scheduler.jobs.course_index_refresh import refresh_course_index
 from scheduler.jobs.legacy_course_index import run_legacy_course_index
+from scheduler.jobs.owned_course_opening_extract import run_owned_course_opening_extract
 
 logger = logging.getLogger(__name__)
 
 KNOWN_JOB_KEYS = frozenset(
-    {"course_index_refresh", "legacy_course_index", "course_export"}
+    {
+        "course_index_refresh",
+        "legacy_course_index",
+        "course_export",
+        "owned_course_opening_extract",
+    }
 )
 
 _PROCESSING_JOB_KEYS = (
@@ -53,6 +59,14 @@ def _run_job(job_key: str, *, engine, payload: dict | None = None) -> tuple[str,
     if job_key == "course_export":
         pl = dict(payload or {})
         result = run_course_export(engine=engine, payload=pl)
+        if result is None:
+            return "lock_skipped", None
+        if result.status == "SUCCESS":
+            return "succeeded", None
+        return "failed", result.error_message or "job failed"
+    if job_key == "owned_course_opening_extract":
+        pl = dict(payload or {})
+        result = run_owned_course_opening_extract(engine=engine, payload=pl)
         if result is None:
             return "lock_skipped", None
         if result.status == "SUCCESS":

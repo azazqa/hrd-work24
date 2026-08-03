@@ -55,10 +55,15 @@ export type OwnedSettlementCompareResult = {
   items_unmapped: OwnedSettlementCompareItem[];
 };
 
-export type OwnedCourseOpeningRefreshResult = {
+export type OwnedOpeningExtractQueue = {
+  id: number;
   year: number;
-  row_count: number;
-  extracted_at: string;
+  status: string;
+  row_count: number | null;
+  extracted_at: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 function formatApiError(detail: unknown): string {
@@ -145,7 +150,7 @@ export async function compareOwnedSettlements(
 
 export async function refreshOwnedCourseOpenings(
   year: number,
-): Promise<OwnedCourseOpeningRefreshResult | { message: string }> {
+): Promise<OwnedOpeningExtractQueue | { message: string }> {
   const baseURL = process.env.API_BASE_URL;
   if (!baseURL) {
     return { message: "API_BASE_URL is not configured" };
@@ -165,7 +170,7 @@ export async function refreshOwnedCourseOpenings(
   );
 
   if (!res.ok) {
-    let message = `추출에 실패했습니다. (HTTP ${res.status})`;
+    let message = `추출 요청에 실패했습니다. (HTTP ${res.status})`;
     try {
       const body = (await res.json()) as { detail?: unknown };
       message = formatApiError(body.detail) || message;
@@ -175,5 +180,36 @@ export async function refreshOwnedCourseOpenings(
     return { message };
   }
 
-  return (await res.json()) as OwnedCourseOpeningRefreshResult;
+  return (await res.json()) as OwnedOpeningExtractQueue;
+}
+
+export async function fetchOwnedCourseOpeningRefreshJob(
+  queueId: number,
+): Promise<OwnedOpeningExtractQueue | { message: string }> {
+  const baseURL = process.env.API_BASE_URL;
+  if (!baseURL) {
+    return { message: "API_BASE_URL is not configured" };
+  }
+
+  const token = await requireAccessToken();
+  const res = await fetch(
+    `${baseURL}/settlements/compare-owned/refresh-jobs/${queueId}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    },
+  );
+
+  if (!res.ok) {
+    let message = `추출 상태 조회에 실패했습니다. (HTTP ${res.status})`;
+    try {
+      const body = (await res.json()) as { detail?: unknown };
+      message = formatApiError(body.detail) || message;
+    } catch {
+      /* ignore */
+    }
+    return { message };
+  }
+
+  return (await res.json()) as OwnedOpeningExtractQueue;
 }

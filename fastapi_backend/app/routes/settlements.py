@@ -14,11 +14,18 @@ from openpyxl import Workbook, load_workbook
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.config import settings
 from app.database import get_async_session
-from app.es import get_es
-from app.models import ClientNameMapping, OwnedCourseOpening, Settlement, User
+from app.models import (
+    ClientNameMapping,
+    OwnedCourseOpening,
+    SchedulerJob,
+    SchedulerJobQueue,
+    Settlement,
+    User,
+)
 from app.pagination import MAX_PAGE_SIZE, Page, Params
 from app.routes.courses import (
     MAX_EXPORT_ROWS,
@@ -34,6 +41,10 @@ from app.users import current_active_user
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+QUEUE_ACTION_RUN_NOW = "RUN_NOW"
+QUEUE_STATUS_PENDING = "PENDING"
+OWNED_OPENING_EXTRACT_JOB_KEY = "owned_course_opening_extract"
 
 EXCEL_HEADERS: list[tuple[str, str]] = [
     ("매입년월", "purchase_ym"),
@@ -517,10 +528,41 @@ class OwnedSettlementCompareResult(BaseModel):
     items_unmapped: list[OwnedSettlementCompareItem] = Field(default_factory=list)
 
 
-class OwnedCourseOpeningRefreshResult(BaseModel):
+class OwnedOpeningExtractQueueRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
     year: int
-    row_count: int
-    extracted_at: datetime
+    status: str
+    row_count: int | None = None
+    extracted_at: datetime | None = None
+    error_message: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+def _queue_to_extract_read(row: SchedulerJobQueue) -> OwnedOpeningExtractQueueRead:
+    payload = dict(row.payload or {})
+    year_raw = payload.get("year")
+    year = int(year_raw) if year_raw is not None else 0
+    row_count_raw = payload.get("row_count")
+    extracted_raw = payload.get("extracted_at")
+    extracted_at: datetime | None = None
+    if isinstance(extracted_raw, str) and extracted_raw:
+        try:
+            extracted_at = datetime.fromisoformat(extracted_raw)
+        except ValueError:
+            extracted_at = None
+    return OwnedOpeningExtractQueueRead(
+        id=row.id,
+        year=year,
+        status=row.status,
+        row_count=int(row_count_raw) if row_count_raw is not None else None,
+        extracted_at=extracted_at,
+        error_message=row.error_message,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
 
 
 def _normalize_compare_date(value: Any) -> date | None:
@@ -730,66 +772,87 @@ def _build_compare_result(
 
 @router.post(
     "/compare-owned/refresh",
-    response_model=OwnedCourseOpeningRefreshResult,
+    response_model=OwnedOpeningExtractQueueRead,
+    status_code=202,
 )
-async def refresh_owned_course_openings(
+async def enqueue_owned_course_opening_refresh(
     year: int = Query(..., ge=2000, le=2100, description="추출할 훈련시작일 연도"),
     min_score: float = Query(default=0, ge=0, description="보유과정 ES 매칭 min_score"),
     session: AsyncSession = Depends(get_async_session),
-    _: User = Depends(current_active_user),
+    user: User = Depends(current_active_user),
 ):
-    names = await _load_active_owned_names(session)
-    owned_rows: list[dict[str, Any]] = []
-    if names:
-        body = _build_owned_scroll_body(names, year, min_score, False)
-        es = get_es()
-        try:
-            owned_rows = await _scroll_owned_courses(es, body)
-        except HTTPException:
-            raise
-        except Exception as exc:
-            logger.exception("Elasticsearch owned scroll failed for year=%s", year)
-            raise HTTPException(
-                status_code=502, detail=f"과정 검색에 실패했습니다: {exc}"
-            ) from exc
-
-    extracted_at = datetime.now(timezone.utc)
-
-    await session.execute(
-        update(OwnedCourseOpening)
-        .where(
-            OwnedCourseOpening.is_delete == False,  # noqa: E712
-            OwnedCourseOpening.year == year,
+    """ES 추출은 scheduler_job_queue에서 비동기로 처리. queue 행을 즉시 반환한다."""
+    in_flight_rows = (
+        await session.execute(
+            select(SchedulerJobQueue)
+            .where(
+                SchedulerJobQueue.is_delete == False,  # noqa: E712
+                SchedulerJobQueue.job_key == OWNED_OPENING_EXTRACT_JOB_KEY,
+                SchedulerJobQueue.status.in_(("PENDING", "PROCESSING")),
+            )
+            .order_by(SchedulerJobQueue.id.desc())
+            .limit(50)
         )
-        .values(is_delete=True)
-    )
+    ).scalars().all()
+    for row in in_flight_rows:
+        payload = dict(row.payload or {})
+        if int(payload.get("year") or 0) == year:
+            return _queue_to_extract_read(row)
 
-    to_insert: list[OwnedCourseOpening] = []
-    for row in owned_rows:
-        to_insert.append(
-            OwnedCourseOpening(
-                year=year,
-                institution_name=(row.get("institution_name") or None),
-                course_name=(row.get("course_name") or None),
-                tra_start_date=_normalize_compare_date(row.get("tra_start_date")),
-                tra_end_date=_normalize_compare_date(row.get("tra_end_date")),
-                reg_course_man=(
-                    str(row["reg_course_man"])[:50]
-                    if row.get("reg_course_man") is not None
-                    else None
-                ),
-                extracted_at=extracted_at,
+    job_def = await session.get(SchedulerJob, OWNED_OPENING_EXTRACT_JOB_KEY)
+    if job_def is None:
+        session.add(
+            SchedulerJob(
+                job_key=OWNED_OPENING_EXTRACT_JOB_KEY,
+                title="개설 보유과정 추출",
+                enabled=False,
+                cron_hour=3,
+                cron_minute=0,
+                timezone="Asia/Seoul",
+                description="ES에서 개설 보유과정을 추출해 캐시 테이블에 연도별 적재",
             )
         )
-    if to_insert:
-        session.add_all(to_insert)
-    await session.commit()
+        await session.commit()
+    elif job_def.is_delete:
+        job_def.is_delete = False
+        job_def.enabled = False
+        await session.commit()
 
-    return OwnedCourseOpeningRefreshResult(
-        year=year,
-        row_count=len(to_insert),
-        extracted_at=extracted_at,
+    q = SchedulerJobQueue(
+        job_key=OWNED_OPENING_EXTRACT_JOB_KEY,
+        action=QUEUE_ACTION_RUN_NOW,
+        status=QUEUE_STATUS_PENDING,
+        requested_by_user_id=user.id,
+        payload={"year": year, "min_score": min_score},
     )
+    session.add(q)
+    await session.commit()
+    await session.refresh(q)
+
+    q.payload = {**(q.payload or {}), "queue_id": q.id, "year": year, "min_score": min_score}
+    flag_modified(q, "payload")
+    await session.commit()
+    await session.refresh(q)
+    return _queue_to_extract_read(q)
+
+
+@router.get(
+    "/compare-owned/refresh-jobs/{queue_id}",
+    response_model=OwnedOpeningExtractQueueRead,
+)
+async def get_owned_course_opening_refresh_queue(
+    queue_id: int,
+    session: AsyncSession = Depends(get_async_session),
+    _: User = Depends(current_active_user),
+):
+    row = await session.get(SchedulerJobQueue, queue_id)
+    if (
+        row is None
+        or row.is_delete
+        or row.job_key != OWNED_OPENING_EXTRACT_JOB_KEY
+    ):
+        raise HTTPException(status_code=404, detail="추출 작업을 찾을 수 없습니다.")
+    return _queue_to_extract_read(row)
 
 
 @router.get("/compare-owned", response_model=OwnedSettlementCompareResult)

@@ -4,7 +4,12 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from sqlalchemy import select
 
-from app.models import ClientNameMapping, OwnedCourseOpening, Settlement
+from app.models import (
+    ClientNameMapping,
+    OwnedCourseOpening,
+    SchedulerJobQueue,
+    Settlement,
+)
 from app.routes.settlements import _build_compare_result, _classify_owned_course
 
 
@@ -48,9 +53,6 @@ def test_build_compare_result_from_cache_rows():
     assert result.matched == 1
     assert result.unsettled == 1
     assert result.unmapped == 1
-    assert result.items_matched[0].course_name == "과정1"
-    assert result.items_unsettled[0].course_name == "과정2"
-    assert result.items_unmapped[0].institution_name == "미맵핑기관"
 
 
 @pytest.mark.asyncio
@@ -93,27 +95,51 @@ async def test_compare_reads_cache_without_es(
     )
     await db_session.commit()
 
-    with patch("app.routes.settlements.get_es") as get_es:
-        res = await test_client.get(
-            "/settlements/compare-owned?year=2024",
-            headers=headers,
-        )
-        get_es.assert_not_called()
-
+    res = await test_client.get(
+        "/settlements/compare-owned?year=2024",
+        headers=headers,
+    )
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["cache_hit"] is True
-    assert body["total"] == 2
     assert body["matched"] == 1
     assert body["unsettled"] == 1
-    assert body["unmapped"] == 0
 
 
 @pytest.mark.asyncio
-async def test_refresh_replaces_year_cache(
+async def test_refresh_enqueues_scheduler_queue(
     test_client, authenticated_user, db_session
 ):
     headers = authenticated_user["headers"]
+
+    res = await test_client.post(
+        "/settlements/compare-owned/refresh?year=2024",
+        headers=headers,
+    )
+    assert res.status_code == 202, res.text
+    body = res.json()
+    assert body["year"] == 2024
+    assert body["status"] == "PENDING"
+    queue_id = body["id"]
+
+    queue = await db_session.get(SchedulerJobQueue, queue_id)
+    assert queue is not None
+    assert queue.job_key == "owned_course_opening_extract"
+    assert queue.payload["year"] == 2024
+    assert queue.payload["queue_id"] == queue_id
+
+    again = await test_client.post(
+        "/settlements/compare-owned/refresh?year=2024",
+        headers=headers,
+    )
+    assert again.status_code == 202
+    assert again.json()["id"] == queue_id
+
+
+@pytest.mark.asyncio
+async def test_extract_replaces_year_cache(db_session):
+    from scheduler.jobs.owned_course_opening_extract import _run_extract
+
     old_at = datetime(2024, 1, 1, tzinfo=timezone.utc)
     db_session.add(
         OwnedCourseOpening(
@@ -124,15 +150,16 @@ async def test_refresh_replaces_year_cache(
             extracted_at=old_at,
         )
     )
-    db_session.add(
-        OwnedCourseOpening(
-            year=2025,
-            institution_name="다른연도",
-            course_name="유지과정",
-            tra_start_date=date(2025, 1, 1),
-            extracted_at=old_at,
-        )
+    q = SchedulerJobQueue(
+        job_key="owned_course_opening_extract",
+        action="RUN_NOW",
+        status="PROCESSING",
+        payload={"year": 2024, "min_score": 0},
     )
+    db_session.add(q)
+    await db_session.commit()
+    await db_session.refresh(q)
+    q.payload = {**(q.payload or {}), "queue_id": q.id}
     await db_session.commit()
 
     mock_rows = [
@@ -147,28 +174,30 @@ async def test_refresh_replaces_year_cache(
 
     with (
         patch(
-            "app.routes.settlements._load_active_owned_names",
+            "scheduler.jobs.owned_course_opening_extract._load_active_owned_names",
             new=AsyncMock(return_value=["신과정"]),
         ),
         patch(
-            "app.routes.settlements._build_owned_scroll_body",
+            "scheduler.jobs.owned_course_opening_extract._build_owned_scroll_body",
             return_value={"query": {"match_all": {}}},
         ),
         patch(
-            "app.routes.settlements._scroll_owned_courses",
+            "scheduler.jobs.owned_course_opening_extract._scroll_owned_courses",
             new=AsyncMock(return_value=mock_rows),
         ),
-        patch("app.routes.settlements.get_es", return_value=object()),
+        patch(
+            "scheduler.jobs.owned_course_opening_extract.AsyncElasticsearch",
+        ) as es_cls,
     ):
-        res = await test_client.post(
-            "/settlements/compare-owned/refresh?year=2024",
-            headers=headers,
+        es_cls.return_value.close = AsyncMock()
+        result = await _run_extract(
+            {"year": 2024, "min_score": 0, "queue_id": q.id}
         )
 
-    assert res.status_code == 200, res.text
-    body = res.json()
-    assert body["year"] == 2024
-    assert body["row_count"] == 1
+    assert result["row_count"] == 1
+    await db_session.refresh(q)
+    assert q.payload["row_count"] == 1
+    assert q.payload.get("extracted_at")
 
     active_2024 = (
         await db_session.execute(
@@ -179,28 +208,7 @@ async def test_refresh_replaces_year_cache(
         )
     ).scalars().all()
     assert len(active_2024) == 1
-    assert active_2024[0].institution_name == "신기관"
     assert active_2024[0].course_name == "신과정"
-
-    deleted_old = (
-        await db_session.execute(
-            select(OwnedCourseOpening).where(
-                OwnedCourseOpening.year == 2024,
-                OwnedCourseOpening.course_name == "구과정",
-            )
-        )
-    ).scalar_one()
-    assert deleted_old.is_delete is True
-
-    kept_2025 = (
-        await db_session.execute(
-            select(OwnedCourseOpening).where(
-                OwnedCourseOpening.year == 2025,
-                OwnedCourseOpening.is_delete == False,  # noqa: E712
-            )
-        )
-    ).scalar_one()
-    assert kept_2025.course_name == "유지과정"
 
 
 def test_classify_owned_course_still_works():

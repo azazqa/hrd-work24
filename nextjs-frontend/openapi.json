@@ -2472,8 +2472,9 @@
         "tags": [
           "settlements"
         ],
-        "summary": "Refresh Owned Course Openings",
-        "operationId": "refresh_owned_course_openings",
+        "summary": "Enqueue Owned Course Opening Refresh",
+        "description": "ES \ucd94\ucd9c\uc740 scheduler_job_queue\uc5d0\uc11c \ube44\ub3d9\uae30\ub85c \ucc98\ub9ac. queue \ud589\uc744 \uc989\uc2dc \ubc18\ud658\ud55c\ub2e4.",
+        "operationId": "enqueue_owned_course_opening_refresh",
         "security": [
           {
             "OAuth2PasswordBearer": []
@@ -2508,12 +2509,59 @@
           }
         ],
         "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnedOpeningExtractQueueRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settlements/compare-owned/refresh-jobs/{queue_id}": {
+      "get": {
+        "tags": [
+          "settlements"
+        ],
+        "summary": "Get Owned Course Opening Refresh Queue",
+        "operationId": "get_owned_course_opening_refresh_queue",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "queue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Queue Id"
+            }
+          }
+        ],
+        "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OwnedCourseOpeningRefreshResult"
+                  "$ref": "#/components/schemas/OwnedOpeningExtractQueueRead"
                 }
               }
             }
@@ -3915,30 +3963,6 @@
         ],
         "title": "OwnedCourseListItem"
       },
-      "OwnedCourseOpeningRefreshResult": {
-        "properties": {
-          "year": {
-            "type": "integer",
-            "title": "Year"
-          },
-          "row_count": {
-            "type": "integer",
-            "title": "Row Count"
-          },
-          "extracted_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Extracted At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "year",
-          "row_count",
-          "extracted_at"
-        ],
-        "title": "OwnedCourseOpeningRefreshResult"
-      },
       "OwnedCourseRead": {
         "properties": {
           "id": {
@@ -4289,6 +4313,75 @@
         },
         "type": "object",
         "title": "OwnedCourseUpdate"
+      },
+      "OwnedOpeningExtractQueueRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "year": {
+            "type": "integer",
+            "title": "Year"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "row_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row Count"
+          },
+          "extracted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extracted At"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "year",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "OwnedOpeningExtractQueueRead"
       },
       "OwnedSettlementCompareItem": {
         "properties": {

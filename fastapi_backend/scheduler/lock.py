@@ -15,6 +15,7 @@ LOCK_IDS: dict[str, int] = {
     "course_index_refresh": 20260101,
     "legacy_course_index": 20260102,
     "course_export": 20260103,
+    "owned_course_opening_extract": 20260104,
 }
 
 

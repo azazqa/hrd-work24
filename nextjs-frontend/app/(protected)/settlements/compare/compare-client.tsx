@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 
 import { createClientMappingAction } from "@/components/actions/client-mappings-action";
 import {
+  fetchOwnedCourseOpeningRefreshJob,
   refreshOwnedCourseOpenings,
   type OwnedSettlementCompareItem,
   type OwnedSettlementCompareResult,
@@ -148,14 +149,50 @@ export function CompareOwnedClient({ year, result, error }: Props) {
     setRefreshing(true);
     setRefreshError(null);
     setRefreshMessage(null);
-    const res = await refreshOwnedCourseOpenings(y);
-    setRefreshing(false);
-    if ("message" in res) {
-      setRefreshError(res.message);
+
+    const enqueued = await refreshOwnedCourseOpenings(y);
+    if ("message" in enqueued) {
+      setRefreshing(false);
+      setRefreshError(enqueued.message);
       return;
     }
+
+    setRefreshMessage(`${y}년 추출을 요청했습니다. 처리 중…`);
+
+    let job = enqueued;
+    const terminal = new Set(["SUCCEEDED", "FAILED"]);
+    const started = Date.now();
+    const maxWaitMs = 30 * 60 * 1000;
+
+    while (!terminal.has(job.status)) {
+      if (Date.now() - started > maxWaitMs) {
+        setRefreshing(false);
+        setRefreshError("추출 대기 시간이 초과되었습니다. 잠시 후 다시 확인해 주세요.");
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 2000));
+      const polled = await fetchOwnedCourseOpeningRefreshJob(job.id);
+      if ("message" in polled) {
+        setRefreshing(false);
+        setRefreshError(polled.message);
+        return;
+      }
+      job = polled;
+      setRefreshMessage(
+        job.status === "PROCESSING"
+          ? `${y}년 추출 처리 중…`
+          : `${y}년 추출 대기 중…`,
+      );
+    }
+
+    setRefreshing(false);
+    if (job.status === "FAILED") {
+      setRefreshError(job.error_message || "추출에 실패했습니다.");
+      return;
+    }
+
     setRefreshMessage(
-      `${res.year}년 개설 보유과정 ${res.row_count.toLocaleString()}건을 추출했습니다.`,
+      `${job.year}년 개설 보유과정 ${(job.row_count ?? 0).toLocaleString()}건을 추출했습니다.`,
     );
     router.push(`/settlements/compare?year=${y}`);
     router.refresh();
