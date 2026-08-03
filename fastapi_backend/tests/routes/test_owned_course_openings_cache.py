@@ -199,16 +199,14 @@ async def test_extract_replaces_year_cache(db_session):
     assert q.payload["row_count"] == 1
     assert q.payload.get("extracted_at")
 
-    active_2024 = (
+    rows_2024 = (
         await db_session.execute(
-            select(OwnedCourseOpening).where(
-                OwnedCourseOpening.year == 2024,
-                OwnedCourseOpening.is_delete == False,  # noqa: E712
-            )
+            select(OwnedCourseOpening).where(OwnedCourseOpening.year == 2024)
         )
     ).scalars().all()
-    assert len(active_2024) == 1
-    assert active_2024[0].course_name == "신과정"
+    assert len(rows_2024) == 1
+    assert rows_2024[0].course_name == "신과정"
+    assert rows_2024[0].institution_name == "신기관"
 
 
 def test_classify_owned_course_still_works():

@@ -7,7 +7,7 @@ from typing import Any
 
 from elasticsearch import AsyncElasticsearch
 from fastapi import HTTPException
-from sqlalchemy import update
+from sqlalchemy import delete
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -58,13 +58,9 @@ async def _run_extract(payload: dict[str, Any]) -> dict[str, Any]:
     extracted_at = datetime.now(timezone.utc)
 
     async with async_session_maker() as session:
+        # 해당 연도 캐시를 전부 삭제 후 추출 결과로 교체한다.
         await session.execute(
-            update(OwnedCourseOpening)
-            .where(
-                OwnedCourseOpening.is_delete == False,  # noqa: E712
-                OwnedCourseOpening.year == year,
-            )
-            .values(is_delete=True)
+            delete(OwnedCourseOpening).where(OwnedCourseOpening.year == year)
         )
 
         to_insert: list[OwnedCourseOpening] = []
