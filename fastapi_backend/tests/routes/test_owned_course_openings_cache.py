@@ -401,7 +401,7 @@ async def test_extract_replaces_year_cache(db_session):
         patch(
             "scheduler.jobs.owned_course_opening_extract._build_owned_scroll_body",
             return_value={"query": {"match_all": {}}},
-        ),
+        ) as build_body,
         patch(
             "scheduler.jobs.owned_course_opening_extract._scroll_owned_courses",
             new=AsyncMock(return_value=mock_rows),
@@ -415,6 +415,9 @@ async def test_extract_replaces_year_cache(db_session):
             {"year": 2024, "min_score": 0, "queue_id": q.id}
         )
 
+    build_body.assert_called_once_with(
+        ["신과정"], 2024, 0.0, has_reg_course_man=True
+    )
     assert result["row_count"] == 1
     await db_session.refresh(q)
     assert q.payload["row_count"] == 1

@@ -43,7 +43,9 @@ async def _run_extract(payload: dict[str, Any]) -> dict[str, Any]:
 
     owned_rows: list[dict[str, Any]] = []
     if names:
-        body = _build_owned_scroll_body(names, year, min_score, False)
+        body = _build_owned_scroll_body(
+            names, year, min_score, has_reg_course_man=True
+        )
         es = AsyncElasticsearch(
             hosts=[settings.ELASTICSEARCH_URL],
             request_timeout=settings.ES_REQUEST_TIMEOUT,
