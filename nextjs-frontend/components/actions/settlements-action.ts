@@ -39,7 +39,7 @@ export type OwnedSettlementCompareItem = {
   tra_start_date: string | null;
   tra_end_date: string | null;
   reg_course_man: string | null;
-  status: "matched" | "unsettled" | "unmapped";
+  status: "matched" | "partial" | "unsettled" | "unmapped";
 };
 
 export type OwnedSettlementCompareStatus =
@@ -49,6 +49,7 @@ export type OwnedSettlementCompareResult = {
   year: number;
   total: number;
   matched: number;
+  partial: number;
   unsettled: number;
   unmapped: number;
   has_result: boolean;

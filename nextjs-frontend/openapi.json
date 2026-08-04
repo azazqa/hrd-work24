@@ -2739,6 +2739,7 @@
             "schema": {
               "enum": [
                 "matched",
+                "partial",
                 "unsettled",
                 "unmapped"
               ],
@@ -4675,6 +4676,7 @@
             "type": "string",
             "enum": [
               "matched",
+              "partial",
               "unsettled",
               "unmapped"
             ],
@@ -4700,6 +4702,11 @@
           "matched": {
             "type": "integer",
             "title": "Matched"
+          },
+          "partial": {
+            "type": "integer",
+            "title": "Partial",
+            "default": 0
           },
           "unsettled": {
             "type": "integer",

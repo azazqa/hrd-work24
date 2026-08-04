@@ -55,6 +55,7 @@ async def test_get_compare_reads_stored_results_only(
             client_name="고객A",
             course_name="과정매칭",
             education_period_date=date(2024, 5, 1),
+            headcount=2,
         ),
     )
 
@@ -80,6 +81,7 @@ async def test_get_compare_reads_stored_results_only(
     body = run.json()
     assert body["has_result"] is True
     assert body["matched"] == 1
+    assert body["partial"] == 0
     assert body["unsettled"] == 1
     assert body["unmapped"] == 0
     assert body["compared_at"]
@@ -123,7 +125,7 @@ async def test_get_compare_reads_stored_results_only(
     )
     assert export_res.status_code == 200, export_res.text
     wb = load_workbook(BytesIO(export_res.content))
-    assert wb.sheetnames == ["요약", "미정산", "맵핑없음", "정산됨"]
+    assert wb.sheetnames == ["요약", "미정산", "일부정산", "맵핑없음", "정산됨"]
     assert wb["요약"]["B2"].value == 2024
     assert wb["요약"]["B3"].value == 2
     assert wb["미정산"]["C2"].value == "과정미정산"
@@ -196,6 +198,7 @@ async def test_compare_auto_registers_identity_mapping(
             institution_name="동일고객사",
             course_name="과정자동",
             tra_start_date=date(2024, 4, 1),
+            reg_course_man="1",
             extracted_at=extracted_at,
         ),
         Settlement(
@@ -204,6 +207,7 @@ async def test_compare_auto_registers_identity_mapping(
             client_name="동일고객사",
             course_name="과정자동",
             education_period_date=date(2024, 4, 1),
+            headcount=1,
         ),
     )
 
@@ -240,6 +244,7 @@ async def test_compare_auto_registers_mapping_ignoring_internal_spaces(
             institution_name="에이 비씨",
             course_name="과정공백",
             tra_start_date=date(2024, 7, 1),
+            reg_course_man="1",
             extracted_at=extracted_at,
         ),
         Settlement(
@@ -248,6 +253,7 @@ async def test_compare_auto_registers_mapping_ignoring_internal_spaces(
             client_name="에이비씨",
             course_name="과정공백",
             education_period_date=date(2024, 7, 1),
+            headcount=1,
         ),
     )
 

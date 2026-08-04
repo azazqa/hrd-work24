@@ -102,7 +102,52 @@ async def test_compare_uses_consolidated_mv(
     )
     assert res.status_code == 200, res.text
     assert res.json()["matched"] == 1
+    assert res.json()["partial"] == 0
     assert res.json()["unsettled"] == 0
+
+
+@pytest.mark.asyncio
+async def test_compare_partial_when_headcount_differs(
+    test_client, authenticated_user, db_session
+):
+    headers = authenticated_user["headers"]
+    extracted_at = datetime.now(timezone.utc)
+    db_session.add(
+        ClientNameMapping(institution_name="고객합산", client_name="고객합산")
+    )
+    db_session.add(
+        OwnedCourseOpening(
+            year=2024,
+            institution_name="고객합산",
+            course_name="분할과정",
+            tra_start_date=date(2024, 5, 1),
+            reg_course_man="10",
+            extracted_at=extracted_at,
+        )
+    )
+    for _ in range(3):
+        db_session.add(Settlement(**_same_course_kwargs()))
+    await db_session.commit()
+    await _refresh_settlements_consolidated(db_session)
+
+    res = await test_client.post(
+        "/settlements/compare-owned?year=2024",
+        headers=headers,
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["matched"] == 0
+    assert body["partial"] == 1
+    assert body["unsettled"] == 0
+
+    items = await test_client.get(
+        "/settlements/compare-owned/items?year=2024&status=partial&page=1&size=50",
+        headers=headers,
+    )
+    assert items.status_code == 200
+    assert items.json()["total"] == 1
+    assert items.json()["items"][0]["status"] == "partial"
+    assert items.json()["items"][0]["reg_course_man"] == "10"
 
 
 @pytest.mark.asyncio

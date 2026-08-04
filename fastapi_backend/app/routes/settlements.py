@@ -12,7 +12,20 @@ from fastapi.responses import StreamingResponse
 from fastapi_pagination.ext.sqlalchemy import apaginate
 from openpyxl import Workbook, load_workbook
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import and_, case, delete, exists, func, literal, select, text, update
+from sqlalchemy import (
+    Integer,
+    and_,
+    case,
+    cast,
+    delete,
+    exists,
+    func,
+    literal,
+    or_,
+    select,
+    text,
+    update,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -610,7 +623,7 @@ async def import_settlements(
     )
 
 
-CompareStatus = Literal["matched", "unsettled", "unmapped"]
+CompareStatus = Literal["matched", "partial", "unsettled", "unmapped"]
 
 
 class OwnedSettlementCompareItem(BaseModel):
@@ -629,6 +642,7 @@ class OwnedSettlementCompareResult(BaseModel):
     year: int
     total: int
     matched: int
+    partial: int = 0
     unsettled: int
     unmapped: int
     has_result: bool = False
@@ -708,27 +722,45 @@ def _format_date_cell(value: Any) -> str | None:
 
 
 def _compare_status_expr():
-    """보유과정 row → matched | unsettled | unmapped SQL 식."""
+    """보유과정 row → matched | partial | unsettled | unmapped SQL 식."""
     course_trim = func.coalesce(func.trim(OwnedCourseOpening.course_name), "")
-    settlement_matched = exists(
-        select(literal(1)).where(
-            func.trim(SettlementConsolidated.client_name)
-            == ClientNameMapping.client_name,
-            func.trim(SettlementConsolidated.course_name) == course_trim,
-            SettlementConsolidated.education_period_date
-            == OwnedCourseOpening.tra_start_date,
-        )
+    settlement_key = and_(
+        func.trim(SettlementConsolidated.client_name) == ClientNameMapping.client_name,
+        func.trim(SettlementConsolidated.course_name) == course_trim,
+        SettlementConsolidated.education_period_date
+        == OwnedCourseOpening.tra_start_date,
+    )
+    has_settlement = exists(select(literal(1)).where(settlement_key))
+    settlement_headcount = (
+        select(func.coalesce(func.sum(SettlementConsolidated.headcount), 0))
+        .where(settlement_key)
+        .correlate_except(SettlementConsolidated)
+        .scalar_subquery()
+    )
+    owned_man = func.trim(OwnedCourseOpening.reg_course_man)
+    owned_headcount = case(
+        (owned_man.op("~")(r"^[0-9]+$"), cast(owned_man, Integer)),
+        else_=None,
     )
     return case(
         (ClientNameMapping.id.is_(None), literal("unmapped")),
         (
+            or_(
+                OwnedCourseOpening.tra_start_date.is_(None),
+                course_trim == "",
+                ~has_settlement,
+            ),
+            literal("unsettled"),
+        ),
+        (
             and_(
-                OwnedCourseOpening.tra_start_date.is_not(None),
-                course_trim != "",
-                settlement_matched,
+                has_settlement,
+                owned_headcount.is_not(None),
+                owned_headcount == settlement_headcount,
             ),
             literal("matched"),
         ),
+        (has_settlement, literal("partial")),
         else_=literal("unsettled"),
     )
 
@@ -1010,6 +1042,15 @@ async def _load_compare_summary(
                 func.coalesce(
                     func.sum(
                         case(
+                            (OwnedSettlementCompareResultRow.status == "partial", 1),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ).label("partial"),
+                func.coalesce(
+                    func.sum(
+                        case(
                             (OwnedSettlementCompareResultRow.status == "unsettled", 1),
                             else_=0,
                         )
@@ -1040,6 +1081,7 @@ async def _load_compare_summary(
         year=year,
         total=total,
         matched=int(counts.matched or 0),
+        partial=int(counts.partial or 0),
         unsettled=int(counts.unsettled or 0),
         unmapped=int(counts.unmapped or 0),
         has_result=has_result,
@@ -1196,6 +1238,7 @@ _COMPARE_EXPORT_HEADERS = [
 
 _COMPARE_STATUS_SHEETS: list[tuple[CompareStatus, str]] = [
     ("unsettled", "미정산"),
+    ("partial", "일부정산"),
     ("unmapped", "맵핑없음"),
     ("matched", "정산됨"),
 ]
@@ -1253,6 +1296,7 @@ async def export_owned_settlement_compare(
 
     by_status: dict[str, list[OwnedSettlementCompareResultRow]] = {
         "matched": [],
+        "partial": [],
         "unsettled": [],
         "unmapped": [],
     }
@@ -1266,6 +1310,7 @@ async def export_owned_settlement_compare(
     ws_summary.append(["연도", year])
     ws_summary.append(["전체", summary.total])
     ws_summary.append(["정산됨", summary.matched])
+    ws_summary.append(["일부 정산", summary.partial])
     ws_summary.append(["미정산", summary.unsettled])
     ws_summary.append(["맵핑 없음", summary.unmapped])
     ws_summary.append(
