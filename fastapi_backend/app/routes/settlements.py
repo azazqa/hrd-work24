@@ -721,12 +721,19 @@ def _format_date_cell(value: Any) -> str | None:
     return str(value)
 
 
+def _sql_strip_all_whitespace(column):
+    """SQL 비교용: 공백·탭·개행 등 모든 공백 문자 제거."""
+    return func.regexp_replace(func.coalesce(column, ""), r"\s+", "", "g")
+
+
 def _compare_status_expr():
     """보유과정 row → matched | partial | unsettled | unmapped SQL 식."""
-    course_trim = func.coalesce(func.trim(OwnedCourseOpening.course_name), "")
+    owned_course_key = _sql_strip_all_whitespace(OwnedCourseOpening.course_name)
     settlement_key = and_(
-        func.trim(SettlementConsolidated.client_name) == ClientNameMapping.client_name,
-        func.trim(SettlementConsolidated.course_name) == course_trim,
+        _sql_strip_all_whitespace(SettlementConsolidated.client_name)
+        == _sql_strip_all_whitespace(ClientNameMapping.client_name),
+        _sql_strip_all_whitespace(SettlementConsolidated.course_name)
+        == owned_course_key,
         SettlementConsolidated.education_period_date
         == OwnedCourseOpening.tra_start_date,
     )
@@ -747,7 +754,7 @@ def _compare_status_expr():
         (
             or_(
                 OwnedCourseOpening.tra_start_date.is_(None),
-                course_trim == "",
+                owned_course_key == "",
                 ~has_settlement,
             ),
             literal("unsettled"),
