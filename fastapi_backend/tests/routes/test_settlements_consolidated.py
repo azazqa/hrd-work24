@@ -241,6 +241,88 @@ async def test_compare_matches_ignoring_spaces_in_course_and_client(
     assert body["unsettled"] == 0
 
 
+def test_normalize_course_name_for_compare():
+    from app.routes.settlements import _normalize_course_name_for_compare
+
+    assert (
+        _normalize_course_name_for_compare(
+            "[2023기업직업훈련카드]마음을 움직이는 카피라이팅과 글쓰기"
+        )
+        == "마음을움직이는카피라이팅과글쓰기"
+    )
+    assert (
+        _normalize_course_name_for_compare(
+            "평범한 회사와 직장인을 위한 정보 보안 기본서 (기업직업훈련카드)"
+        )
+        == "평범한회사와직장인을위한정보보안기본서"
+    )
+    assert (
+        _normalize_course_name_for_compare(
+            "[2023기업직업훈련카드]평범한 회사와 직장인을 위한 정보 보안 기본서_23.12"
+        )
+        == "평범한회사와직장인을위한정보보안기본서"
+    )
+    assert (
+        _normalize_course_name_for_compare("[A][B]카피 라이팅")
+        == "카피라이팅"
+    )
+    assert _normalize_course_name_for_compare("   ") == ""
+    assert _normalize_course_name_for_compare(None) == ""
+    assert (
+        _normalize_course_name_for_compare("간호사가 꼭 알아야 할 현장 실무")
+        == _normalize_course_name_for_compare(
+            "[태그]간호사가꼭알아야할현장실무_24.06"
+        )
+    )
+
+
+@pytest.mark.asyncio
+async def test_compare_matches_normalized_course_name_tags(
+    test_client, authenticated_user, db_session
+):
+    """선행[]·후행()·_접미·공백 정규화 후 과정명이 같으면 매칭한다."""
+    headers = authenticated_user["headers"]
+    extracted_at = datetime.now(timezone.utc)
+    db_session.add(
+        ClientNameMapping(institution_name="정규화기관", client_name="정규화고객")
+    )
+    db_session.add(
+        OwnedCourseOpening(
+            year=2024,
+            institution_name="정규화기관",
+            course_name="간호사가 꼭 알아야 할 현장 실무",
+            tra_start_date=date(2024, 6, 30),
+            reg_course_man="88",
+            extracted_at=extracted_at,
+        )
+    )
+    db_session.add(
+        Settlement(
+            **_same_course_kwargs(
+                purchase_ym="202406",
+                purchase_year=2024,
+                client_name="정규화고객",
+                course_name="[태그]간호사가꼭알아야할현장실무_24.06",
+                education_period="2024.06.30",
+                education_period_date=date(2024, 6, 30),
+                headcount=161,
+            )
+        )
+    )
+    await db_session.commit()
+    await _refresh_settlements_consolidated(db_session)
+
+    res = await test_client.post(
+        "/settlements/compare-owned?year=2024",
+        headers=headers,
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["matched"] == 0
+    assert body["partial"] == 1
+    assert body["unsettled"] == 0
+
+
 @pytest.mark.asyncio
 async def test_export_settlements_consolidated_xlsx(
     test_client, authenticated_user, db_session

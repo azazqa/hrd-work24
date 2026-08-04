@@ -752,13 +752,44 @@ def _sql_strip_all_whitespace(column):
     return func.regexp_replace(func.coalesce(column, ""), r"\s+", "", "g")
 
 
+_LEADING_BRACKET_TAGS_RE = re.compile(r"^(?:\[[^\]]*\])+")
+_TRAILING_PAREN_TAGS_RE = re.compile(r"(?:\s*\([^)]*\))+$")
+_LAST_UNDERSCORE_SUFFIX_RE = re.compile(r"_[^_]*$")
+
+
+def _normalize_course_name_for_compare(value: str | None) -> str:
+    """과정명 비교 정규화: 선행[]·후행()·마지막_접미 제거 후 공백 제거."""
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text:
+        return ""
+    text = _LEADING_BRACKET_TAGS_RE.sub("", text)
+    text = _TRAILING_PAREN_TAGS_RE.sub("", text)
+    text = _LAST_UNDERSCORE_SUFFIX_RE.sub("", text)
+    return re.sub(r"\s+", "", text)
+
+
+def _sql_normalize_course_name(column):
+    """과정명 비교용 SQL 정규화 (_normalize_course_name_for_compare 와 동일 순서)."""
+    text = func.trim(func.coalesce(column, ""))
+    # 선행 [태그] 여러 개
+    text = func.regexp_replace(text, r"^(?:\[[^\]]*\])+", "", "g")
+    # 후행 (태그) 여러 개 (앞 공백 허용)
+    text = func.regexp_replace(text, r"(?:\s*\([^)]*\))+$", "", "g")
+    # 마지막 _접미
+    text = func.regexp_replace(text, r"_[^_]*$", "", "g")
+    # 모든 공백 제거
+    return func.regexp_replace(text, r"\s+", "", "g")
+
+
 def _compare_status_expr():
     """보유과정 row → matched | partial | unsettled | unmapped SQL 식."""
-    owned_course_key = _sql_strip_all_whitespace(OwnedCourseOpening.course_name)
+    owned_course_key = _sql_normalize_course_name(OwnedCourseOpening.course_name)
     settlement_key = and_(
         _sql_strip_all_whitespace(SettlementConsolidated.client_name)
         == _sql_strip_all_whitespace(ClientNameMapping.client_name),
-        _sql_strip_all_whitespace(SettlementConsolidated.course_name)
+        _sql_normalize_course_name(SettlementConsolidated.course_name)
         == owned_course_key,
         SettlementConsolidated.education_period_date
         == OwnedCourseOpening.tra_start_date,
