@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from fastapi_pagination.ext.sqlalchemy import apaginate
 from openpyxl import Workbook, load_workbook
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import and_, case, delete, exists, func, literal, select, update
+from sqlalchemy import and_, case, delete, exists, func, literal, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -25,6 +25,7 @@ from app.models import (
     SchedulerJob,
     SchedulerJobQueue,
     Settlement,
+    SettlementConsolidated,
     User,
 )
 from app.pagination import MAX_PAGE_SIZE, Page, Params
@@ -44,6 +45,31 @@ router = APIRouter()
 QUEUE_ACTION_RUN_NOW = "RUN_NOW"
 QUEUE_STATUS_PENDING = "PENDING"
 OWNED_OPENING_EXTRACT_JOB_KEY = "owned_course_opening_extract"
+
+SETTLEMENTS_CONSOLIDATED_MV = "settlements_consolidated"
+
+CREATE_SETTLEMENTS_CONSOLIDATED_SQL = """
+CREATE MATERIALIZED VIEW settlements_consolidated AS
+SELECT
+  purchase_ym, purchase_year, sales_ym, client_name, course_name,
+  education_period, education_period_date,
+  SUM(headcount) AS headcount,
+  base_tuition, textbook_fee, exclude_amount, share_rate,
+  net_sales, settlement_rate, settlement_amount, note, sales_rep
+FROM settlements
+WHERE is_delete = false
+GROUP BY
+  purchase_ym, purchase_year, sales_ym, client_name, course_name,
+  education_period, education_period_date,
+  base_tuition, textbook_fee, exclude_amount, share_rate,
+  net_sales, settlement_rate, settlement_amount, note, sales_rep
+WITH DATA
+"""
+
+CREATE_SETTLEMENTS_CONSOLIDATED_INDEX_SQL = """
+CREATE INDEX ix_settlements_consolidated_match
+  ON settlements_consolidated (client_name, course_name, education_period_date)
+"""
 
 EXCEL_HEADERS: list[tuple[str, str]] = [
     ("매입년월", "purchase_ym"),
@@ -92,6 +118,30 @@ def _parse_str(value: Any) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+async def _refresh_settlements_consolidated(session: AsyncSession) -> None:
+    """정산 테이블 변경 후 consolidated MV 갱신."""
+    await session.execute(
+        text(f"REFRESH MATERIALIZED VIEW {SETTLEMENTS_CONSOLIDATED_MV}")
+    )
+    await session.commit()
+
+
+def ensure_settlements_consolidated_mv(connection) -> None:
+    """테스트/초기화용: MV를 (재)생성한다. sync connection."""
+    connection.execute(
+        text("DROP MATERIALIZED VIEW IF EXISTS settlements_consolidated CASCADE")
+    )
+    connection.execute(text(CREATE_SETTLEMENTS_CONSOLIDATED_SQL))
+    connection.execute(text(CREATE_SETTLEMENTS_CONSOLIDATED_INDEX_SQL))
+
+
+def drop_settlements_consolidated_mv(connection) -> None:
+    """테스트 teardown용. sync connection."""
+    connection.execute(
+        text("DROP MATERIALIZED VIEW IF EXISTS settlements_consolidated CASCADE")
+    )
 
 
 def _normalize_ym(value: Any) -> str | None:
@@ -499,6 +549,7 @@ async def import_settlements(
         session.add_all(to_insert)
     await session.commit()
     wb.close()
+    await _refresh_settlements_consolidated(session)
     return SettlementImportResult(
         deleted=deleted, created=created, failed=failed, errors=errors
     )
@@ -603,14 +654,14 @@ def _format_date_cell(value: Any) -> str | None:
 
 def _compare_status_expr():
     """보유과정 row → matched | unsettled | unmapped SQL 식."""
-    inst_trim = func.trim(OwnedCourseOpening.institution_name)
     course_trim = func.coalesce(func.trim(OwnedCourseOpening.course_name), "")
     settlement_matched = exists(
         select(literal(1)).where(
-            Settlement.is_delete == False,  # noqa: E712
-            func.trim(Settlement.client_name) == ClientNameMapping.client_name,
-            func.trim(Settlement.course_name) == course_trim,
-            Settlement.education_period_date == OwnedCourseOpening.tra_start_date,
+            func.trim(SettlementConsolidated.client_name)
+            == ClientNameMapping.client_name,
+            func.trim(SettlementConsolidated.course_name) == course_trim,
+            SettlementConsolidated.education_period_date
+            == OwnedCourseOpening.tra_start_date,
         )
     )
     return case(

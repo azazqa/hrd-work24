@@ -32,6 +32,13 @@ class Base(DeclarativeBase):
     )
 
 
+class ViewBase(DeclarativeBase):
+    """DB 뷰/머티리얼라이즈드 뷰 매핑용 (공통 감사 컬럼 없음)."""
+
+    pass
+
+
+
 class User(SQLAlchemyBaseUserTableUUID, Base):
     pass
 
@@ -174,6 +181,30 @@ class Settlement(Base):
     settlement_amount = Column(Numeric(18, 4), nullable=True)
     note = Column(Text, nullable=True)
     sales_rep = Column(String(100), nullable=True)
+
+
+class SettlementConsolidated(ViewBase):
+    """정산 정리 materialized view (인원 SUM, 그 외 컬럼 동일 시 병합). 읽기 전용."""
+
+    __tablename__ = "settlements_consolidated"
+
+    purchase_ym = Column(String(6), primary_key=True)
+    purchase_year = Column(Integer, primary_key=True)
+    sales_ym = Column(String(6), primary_key=True, nullable=True)
+    client_name = Column(String(255), primary_key=True)
+    course_name = Column(String(500), primary_key=True)
+    education_period = Column(String(100), primary_key=True, nullable=True)
+    education_period_date = Column(Date, primary_key=True, nullable=True)
+    headcount = Column(Integer, nullable=True)
+    base_tuition = Column(Numeric(18, 4), primary_key=True, nullable=True)
+    textbook_fee = Column(Numeric(18, 4), primary_key=True, nullable=True)
+    exclude_amount = Column(Numeric(18, 4), primary_key=True, nullable=True)
+    share_rate = Column(Numeric(10, 6), primary_key=True, nullable=True)
+    net_sales = Column(Numeric(18, 4), primary_key=True, nullable=True)
+    settlement_rate = Column(Numeric(10, 6), primary_key=True, nullable=True)
+    settlement_amount = Column(Numeric(18, 4), primary_key=True, nullable=True)
+    note = Column(Text, primary_key=True, nullable=True)
+    sales_rep = Column(String(100), primary_key=True, nullable=True)
 
 
 class ClientNameMapping(Base):

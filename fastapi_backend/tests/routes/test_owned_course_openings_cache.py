@@ -13,6 +13,15 @@ from app.models import (
     SchedulerJobQueue,
     Settlement,
 )
+from app.routes.settlements import _refresh_settlements_consolidated
+
+
+async def _seed_and_refresh_mv(db_session, *rows):
+    for row in rows:
+        db_session.add(row)
+    await db_session.commit()
+    await _refresh_settlements_consolidated(db_session)
+
 
 
 @pytest.mark.asyncio
@@ -21,10 +30,9 @@ async def test_get_compare_reads_stored_results_only(
 ):
     headers = authenticated_user["headers"]
     extracted_at = datetime.now(timezone.utc)
-    db_session.add(
-        ClientNameMapping(institution_name="기관A", client_name="고객A")
-    )
-    db_session.add(
+    await _seed_and_refresh_mv(
+        db_session,
+        ClientNameMapping(institution_name="기관A", client_name="고객A"),
         OwnedCourseOpening(
             year=2024,
             institution_name="기관A",
@@ -33,27 +41,22 @@ async def test_get_compare_reads_stored_results_only(
             tra_end_date=date(2024, 5, 10),
             reg_course_man="2",
             extracted_at=extracted_at,
-        )
-    )
-    db_session.add(
+        ),
         OwnedCourseOpening(
             year=2024,
             institution_name="기관A",
             course_name="과정미정산",
             tra_start_date=date(2024, 6, 1),
             extracted_at=extracted_at,
-        )
-    )
-    db_session.add(
+        ),
         Settlement(
             purchase_ym="202405",
             purchase_year=2024,
             client_name="고객A",
             course_name="과정매칭",
             education_period_date=date(2024, 5, 1),
-        )
+        ),
     )
-    await db_session.commit()
 
     empty = await test_client.get(
         "/settlements/compare-owned?year=2024",
@@ -134,19 +137,17 @@ async def test_post_compare_replaces_year_rows(
 ):
     headers = authenticated_user["headers"]
     extracted_at = datetime.now(timezone.utc)
-    db_session.add(
-        ClientNameMapping(institution_name="기관A", client_name="고객A")
-    )
-    db_session.add(
+    await _seed_and_refresh_mv(
+        db_session,
+        ClientNameMapping(institution_name="기관A", client_name="고객A"),
         OwnedCourseOpening(
             year=2024,
             institution_name="기관A",
             course_name="과정1",
             tra_start_date=date(2024, 1, 1),
             extracted_at=extracted_at,
-        )
+        ),
     )
-    await db_session.commit()
 
     first = await test_client.post(
         "/settlements/compare-owned?year=2024", headers=headers
@@ -188,25 +189,23 @@ async def test_compare_auto_registers_identity_mapping(
 ):
     headers = authenticated_user["headers"]
     extracted_at = datetime.now(timezone.utc)
-    db_session.add(
+    await _seed_and_refresh_mv(
+        db_session,
         OwnedCourseOpening(
             year=2024,
             institution_name="동일고객사",
             course_name="과정자동",
             tra_start_date=date(2024, 4, 1),
             extracted_at=extracted_at,
-        )
-    )
-    db_session.add(
+        ),
         Settlement(
             purchase_ym="202404",
             purchase_year=2024,
             client_name="동일고객사",
             course_name="과정자동",
             education_period_date=date(2024, 4, 1),
-        )
+        ),
     )
-    await db_session.commit()
 
     res = await test_client.post(
         "/settlements/compare-owned?year=2024",
@@ -234,25 +233,23 @@ async def test_compare_auto_registers_mapping_ignoring_internal_spaces(
 ):
     headers = authenticated_user["headers"]
     extracted_at = datetime.now(timezone.utc)
-    db_session.add(
+    await _seed_and_refresh_mv(
+        db_session,
         OwnedCourseOpening(
             year=2024,
             institution_name="에이 비씨",
             course_name="과정공백",
             tra_start_date=date(2024, 7, 1),
             extracted_at=extracted_at,
-        )
-    )
-    db_session.add(
+        ),
         Settlement(
             purchase_ym="202407",
             purchase_year=2024,
             client_name="에이비씨",
             course_name="과정공백",
             education_period_date=date(2024, 7, 1),
-        )
+        ),
     )
-    await db_session.commit()
 
     res = await test_client.post(
         "/settlements/compare-owned?year=2024",
@@ -288,32 +285,28 @@ async def test_compare_does_not_revive_soft_deleted_mapping(
 ):
     headers = authenticated_user["headers"]
     extracted_at = datetime.now(timezone.utc)
-    db_session.add(
+    await _seed_and_refresh_mv(
+        db_session,
         ClientNameMapping(
             institution_name="삭제된기관",
             client_name="삭제된기관",
             is_delete=True,
-        )
-    )
-    db_session.add(
+        ),
         OwnedCourseOpening(
             year=2024,
             institution_name="삭제된기관",
             course_name="과정",
             tra_start_date=date(2024, 1, 1),
             extracted_at=extracted_at,
-        )
-    )
-    db_session.add(
+        ),
         Settlement(
             purchase_ym="202401",
             purchase_year=2024,
             client_name="삭제된기관",
             course_name="과정",
             education_period_date=date(2024, 1, 1),
-        )
+        ),
     )
-    await db_session.commit()
 
     res = await test_client.post(
         "/settlements/compare-owned?year=2024",

@@ -18,12 +18,19 @@ async def engine():
     """Create a fresh test database engine for each test function."""
     engine = create_async_engine(settings.TEST_DATABASE_URL, echo=True)
 
+    from app.routes.settlements import (
+        drop_settlements_consolidated_mv,
+        ensure_settlements_consolidated_mv,
+    )
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(ensure_settlements_consolidated_mv)
 
     yield engine
 
     async with engine.begin() as conn:
+        await conn.run_sync(drop_settlements_consolidated_mv)
         await conn.run_sync(Base.metadata.drop_all)
 
     await engine.dispose()
