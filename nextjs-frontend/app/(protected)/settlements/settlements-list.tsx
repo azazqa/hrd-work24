@@ -28,6 +28,13 @@ export function SettlementsListHeader() {
         >
           고객사 맵핑
         </a>
+        <a
+          href="/api/settlements/export"
+          download
+          className="inline-flex h-9 items-center rounded-md border px-3 text-sm hover:bg-muted"
+        >
+          내보내기
+        </a>
         <ExcelImportDialog />
       </div>
     </div>

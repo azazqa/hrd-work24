@@ -456,6 +456,61 @@ async def download_import_template(
     )
 
 
+def _excel_cell_value(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value.isoformat()
+    return value
+
+
+@router.get("/export")
+async def export_settlements_consolidated(
+    session: AsyncSession = Depends(get_async_session),
+    _: User = Depends(current_active_user),
+):
+    """정리된 정산 MV(settlements_consolidated) 전체를 xlsx로 내보낸다."""
+    total = await session.scalar(select(func.count()).select_from(SettlementConsolidated))
+    total = int(total or 0)
+    if total > MAX_EXPORT_ROWS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"내보낼 데이터가 {MAX_EXPORT_ROWS:,}건을 초과합니다.",
+        )
+
+    rows = (
+        await session.execute(
+            select(SettlementConsolidated).order_by(
+                SettlementConsolidated.purchase_ym.desc(),
+                SettlementConsolidated.client_name.asc(),
+                SettlementConsolidated.course_name.asc(),
+            )
+        )
+    ).scalars().all()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "정산"
+    ws.append([label for label, _ in EXCEL_HEADERS])
+    for row in rows:
+        ws.append(
+            [_excel_cell_value(getattr(row, field)) for _, field in EXCEL_HEADERS]
+        )
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": 'attachment; filename="settlements_consolidated.xlsx"'
+        },
+    )
+
+
 @router.post("/import", response_model=SettlementImportResult)
 async def import_settlements(
     year: int = Form(..., ge=2000, le=2100, description="교체할 매입년도"),

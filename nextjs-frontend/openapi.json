@@ -2421,6 +2421,31 @@
         ]
       }
     },
+    "/settlements/export": {
+      "get": {
+        "tags": [
+          "settlements"
+        ],
+        "summary": "Export Settlements Consolidated",
+        "description": "\uc815\ub9ac\ub41c \uc815\uc0b0 MV(settlements_consolidated) \uc804\uccb4\ub97c xlsx\ub85c \ub0b4\ubcf4\ub0b8\ub2e4.",
+        "operationId": "export_settlements_consolidated",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/settlements/import": {
       "post": {
         "tags": [

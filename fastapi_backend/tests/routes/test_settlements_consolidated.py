@@ -103,3 +103,46 @@ async def test_compare_uses_consolidated_mv(
     assert res.status_code == 200, res.text
     assert res.json()["matched"] == 1
     assert res.json()["unsettled"] == 0
+
+
+@pytest.mark.asyncio
+async def test_export_settlements_consolidated_xlsx(
+    test_client, authenticated_user, db_session
+):
+    headers = authenticated_user["headers"]
+    for _ in range(3):
+        db_session.add(Settlement(**_same_course_kwargs()))
+    db_session.add(
+        Settlement(
+            **_same_course_kwargs(
+                client_name="다른고객",
+                course_name="다른과정",
+                settlement_amount=Decimal("100"),
+            )
+        )
+    )
+    await db_session.commit()
+    await _refresh_settlements_consolidated(db_session)
+
+    res = await test_client.get("/settlements/export", headers=headers)
+    assert res.status_code == 200, res.text
+    assert "spreadsheetml" in (res.headers.get("content-type") or "")
+
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    wb = load_workbook(BytesIO(res.content))
+    ws = wb.active
+    assert ws.title == "정산"
+    headers_row = [c.value for c in ws[1]]
+    assert headers_row[0] == "매입년월"
+    assert headers_row[5] == "인원"
+    # 3 identical -> 1 row (headcount 3) + 1 other = 2 data rows
+    assert ws.max_row == 3
+    # find 분할과정 row
+    data = [[c.value for c in row] for row in ws.iter_rows(min_row=2, values_only=False)]
+    by_course = {row[3]: row for row in data}
+    assert by_course["분할과정"][5] == 3
+    assert by_course["다른과정"][5] == 1
+    wb.close()
