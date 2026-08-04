@@ -273,12 +273,15 @@ async def test_export_settlements_consolidated_xlsx(
     assert ws.title == "정산"
     headers_row = [c.value for c in ws[1]]
     assert headers_row[0] == "매입년월"
-    assert headers_row[5] == "인원"
+    assert headers_row[4] == "교육기간"
+    assert headers_row[5] == "교육기간(변환)"
+    assert headers_row[6] == "인원"
     # 3 identical -> 1 row (headcount 3) + 1 other = 2 data rows
     assert ws.max_row == 3
     # find 분할과정 row
     data = [[c.value for c in row] for row in ws.iter_rows(min_row=2, values_only=False)]
     by_course = {row[3]: row for row in data}
-    assert by_course["분할과정"][5] == 3
-    assert by_course["다른과정"][5] == 1
+    assert by_course["분할과정"][5] == "2024-05-01"
+    assert by_course["분할과정"][6] == 3
+    assert by_course["다른과정"][6] == 1
     wb.close()

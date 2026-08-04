@@ -105,6 +105,26 @@ EXCEL_HEADERS: list[tuple[str, str]] = [
     ("영업대표", "sales_rep"),
 ]
 
+# 내보내기 전용: 교육기간 오른쪽에 변환 날짜 컬럼
+EXPORT_EXCEL_HEADERS: list[tuple[str, str]] = [
+    ("매입년월", "purchase_ym"),
+    ("매출년월", "sales_ym"),
+    ("고객사", "client_name"),
+    ("과정명", "course_name"),
+    ("교육기간", "education_period"),
+    ("교육기간(변환)", "education_period_date"),
+    ("인원", "headcount"),
+    ("기준수강료", "base_tuition"),
+    ("교재비", "textbook_fee"),
+    ("정산제외금", "exclude_amount"),
+    ("배분율", "share_rate"),
+    ("순매출액", "net_sales"),
+    ("정산율", "settlement_rate"),
+    ("정산액", "settlement_amount"),
+    ("비고", "note"),
+    ("영업대표", "sales_rep"),
+]
+
 HEADER_TO_FIELD = {label: field for label, field in EXCEL_HEADERS}
 HEADER_TO_FIELD_NORM = {
     label.replace(" ", ""): field for label, field in EXCEL_HEADERS
@@ -509,10 +529,13 @@ async def export_settlements_consolidated(
     wb = Workbook()
     ws = wb.active
     ws.title = "정산"
-    ws.append([label for label, _ in EXCEL_HEADERS])
+    ws.append([label for label, _ in EXPORT_EXCEL_HEADERS])
     for row in rows:
         ws.append(
-            [_excel_cell_value(getattr(row, field)) for _, field in EXCEL_HEADERS]
+            [
+                _excel_cell_value(getattr(row, field))
+                for _, field in EXPORT_EXCEL_HEADERS
+            ]
         )
 
     buf = io.BytesIO()
