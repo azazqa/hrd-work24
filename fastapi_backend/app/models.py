@@ -184,7 +184,11 @@ class Settlement(Base):
 
 
 class SettlementConsolidated(ViewBase):
-    """정산 정리 materialized view (인원 SUM, 그 외 컬럼 동일 시 병합). 읽기 전용."""
+    """정산 정리 MV.
+
+    식별키 + 기준수강료·교재비·정산제외금·배분율·정산율·비고·영업대표가 같으면
+    인원·순매출액·정산액을 SUM. 비고가 다르면 별도 행.
+    """
 
     __tablename__ = "settlements_consolidated"
 
@@ -200,9 +204,9 @@ class SettlementConsolidated(ViewBase):
     textbook_fee = Column(Numeric(18, 4), primary_key=True, nullable=True)
     exclude_amount = Column(Numeric(18, 4), primary_key=True, nullable=True)
     share_rate = Column(Numeric(10, 6), primary_key=True, nullable=True)
-    net_sales = Column(Numeric(18, 4), primary_key=True, nullable=True)
+    net_sales = Column(Numeric(18, 4), nullable=True)
     settlement_rate = Column(Numeric(10, 6), primary_key=True, nullable=True)
-    settlement_amount = Column(Numeric(18, 4), primary_key=True, nullable=True)
+    settlement_amount = Column(Numeric(18, 4), nullable=True)
     note = Column(Text, primary_key=True, nullable=True)
     sales_rep = Column(String(100), primary_key=True, nullable=True)
 

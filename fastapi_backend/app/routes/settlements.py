@@ -68,14 +68,17 @@ SELECT
   education_period, education_period_date,
   SUM(headcount) AS headcount,
   base_tuition, textbook_fee, exclude_amount, share_rate,
-  net_sales, settlement_rate, settlement_amount, note, sales_rep
+  SUM(net_sales) AS net_sales,
+  settlement_rate,
+  SUM(settlement_amount) AS settlement_amount,
+  note, sales_rep
 FROM settlements
 WHERE is_delete = false
 GROUP BY
   purchase_ym, purchase_year, sales_ym, client_name, course_name,
   education_period, education_period_date,
   base_tuition, textbook_fee, exclude_amount, share_rate,
-  net_sales, settlement_rate, settlement_amount, note, sales_rep
+  settlement_rate, note, sales_rep
 WITH DATA
 """
 

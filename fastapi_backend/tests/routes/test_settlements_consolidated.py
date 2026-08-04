@@ -54,13 +54,54 @@ async def test_consolidated_mv_sums_identical_rows(db_session):
     ).scalars().all()
     assert len(rows) == 1
     assert rows[0].headcount == 10
-    assert rows[0].settlement_amount == Decimal("350")
+    assert rows[0].base_tuition == Decimal("1000")
+    assert rows[0].share_rate == Decimal("0.3")
+    assert rows[0].settlement_rate == Decimal("0.5")
+    assert rows[0].net_sales == Decimal("7000")
+    assert rows[0].settlement_amount == Decimal("3500")
 
 
 @pytest.mark.asyncio
-async def test_consolidated_mv_keeps_amount_diff_separate(db_session):
-    db_session.add(Settlement(**_same_course_kwargs(settlement_amount=Decimal("350"))))
-    db_session.add(Settlement(**_same_course_kwargs(settlement_amount=Decimal("351"))))
+async def test_consolidated_mv_sums_when_amounts_differ_but_rates_same(db_session):
+    """순매출·정산액만 달라도 요율 키가 같으면 SUM 한다."""
+    db_session.add(
+        Settlement(
+            **_same_course_kwargs(
+                net_sales=Decimal("700"),
+                settlement_amount=Decimal("350"),
+            )
+        )
+    )
+    db_session.add(
+        Settlement(
+            **_same_course_kwargs(
+                net_sales=Decimal("800"),
+                settlement_amount=Decimal("351"),
+            )
+        )
+    )
+    await db_session.commit()
+    await _refresh_settlements_consolidated(db_session)
+
+    rows = (
+        await db_session.execute(
+            select(SettlementConsolidated).where(
+                SettlementConsolidated.client_name == "고객합산"
+            )
+        )
+    ).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].headcount == 2
+    assert rows[0].base_tuition == Decimal("1000")
+    assert rows[0].net_sales == Decimal("1500")
+    assert rows[0].settlement_amount == Decimal("701")
+
+
+@pytest.mark.asyncio
+async def test_consolidated_mv_keeps_note_diff_separate(db_session):
+    """비고가 다르면 다른 과정으로 유지한다."""
+    db_session.add(Settlement(**_same_course_kwargs(note="비고A")))
+    db_session.add(Settlement(**_same_course_kwargs(note="비고B")))
     await db_session.commit()
     await _refresh_settlements_consolidated(db_session)
 
