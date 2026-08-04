@@ -205,6 +205,27 @@ class OwnedCourseOpening(Base):
     )
 
 
+class OwnedSettlementCompareResultRow(Base):
+    """보유과정 정산 비교 결과 스냅샷 (연도별 delete&insert)."""
+
+    __tablename__ = "owned_settlement_compare_results"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    year = Column(Integer, nullable=False, index=True)
+    status = Column(String(20), nullable=False, index=True)
+    institution_name = Column(String(255), nullable=True)
+    client_name = Column(String(255), nullable=True)
+    course_name = Column(String(500), nullable=True)
+    tra_start_date = Column(Date, nullable=True)
+    tra_end_date = Column(Date, nullable=True)
+    reg_course_man = Column(String(50), nullable=True)
+    compared_at = Column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        Index("ix_owned_settlement_compare_results_year_status", "year", "status"),
+    )
+
+
 class Work24ApiLog(Base):
     """Work24 Open API 호출 이력 (headers only)."""
 

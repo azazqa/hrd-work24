@@ -8,6 +8,7 @@ import { createClientMappingAction } from "@/components/actions/client-mappings-
 import {
   fetchOwnedCourseOpeningRefreshJob,
   refreshOwnedCourseOpenings,
+  runOwnedSettlementCompare,
   type OwnedSettlementCompareItem,
   type OwnedSettlementCompareItemsPage,
   type OwnedSettlementCompareResult,
@@ -135,19 +136,23 @@ export function CompareOwnedClient({
   const [clientName, setClientName] = useState("");
   const [mapError, setMapError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [comparing, setComparing] = useState(false);
+  const [compareError, setCompareError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
 
+  const hasResult = Boolean(result?.has_result || result?.cache_hit);
+
   const summary = useMemo(() => {
-    if (!result || !result.cache_hit) return null;
+    if (!result || !hasResult) return null;
     return [
       { label: "전체", value: result.total },
       { label: "정산됨", value: result.matched },
       { label: "미정산", value: result.unsettled },
       { label: "맵핑 없음", value: result.unmapped },
     ];
-  }, [result]);
+  }, [result, hasResult]);
 
   const buildCompareUrl = (
     next: {
@@ -169,13 +174,32 @@ export function CompareOwnedClient({
     return `/settlements/compare?${q.toString()}`;
   };
 
-  const onSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const y = Number(yearInput);
+  const onYearChange = (value: string) => {
+    setYearInput(value);
+    const y = Number(value);
     if (!yearOptions.includes(y)) return;
+    setCompareError(null);
     setRefreshError(null);
     setRefreshMessage(null);
     router.push(buildCompareUrl({ year: y, tab: "unsettled", page: 1 }));
+  };
+
+  const onCompare = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const y = Number(yearInput);
+    if (!yearOptions.includes(y)) return;
+    setComparing(true);
+    setCompareError(null);
+    setRefreshError(null);
+    setRefreshMessage(null);
+    const res = await runOwnedSettlementCompare(y);
+    setComparing(false);
+    if ("message" in res) {
+      setCompareError(res.message);
+      return;
+    }
+    router.push(buildCompareUrl({ year: y, tab: "unsettled", page: 1 }));
+    router.refresh();
   };
 
   const onTabChange = (value: string) => {
@@ -234,7 +258,7 @@ export function CompareOwnedClient({
     }
 
     setRefreshMessage(
-      `${job.year}년 개설 보유과정 ${(job.row_count ?? 0).toLocaleString()}건을 추출했습니다.`,
+      `${job.year}년 개설 보유과정 ${(job.row_count ?? 0).toLocaleString()}건을 추출했습니다. 「비교」로 결과를 갱신하세요.`,
     );
     router.push(buildCompareUrl({ year: y, tab, page: 1 }));
     router.refresh();
@@ -266,10 +290,10 @@ export function CompareOwnedClient({
 
   return (
     <div className="space-y-6">
-      <form onSubmit={onSearch} className="flex flex-wrap items-end gap-4">
+      <form onSubmit={onCompare} className="flex flex-wrap items-end gap-4">
         <div className="space-y-2">
           <Label htmlFor="year">비교 연도</Label>
-          <Select value={yearInput} onValueChange={setYearInput}>
+          <Select value={yearInput} onValueChange={onYearChange}>
             <SelectTrigger id="year" className="w-40">
               <SelectValue placeholder="연도 선택" />
             </SelectTrigger>
@@ -282,7 +306,9 @@ export function CompareOwnedClient({
             </SelectContent>
           </Select>
         </div>
-        <Button type="submit">비교</Button>
+        <Button type="submit" disabled={comparing}>
+          {comparing ? "비교 중…" : "비교"}
+        </Button>
         <Button
           type="button"
           variant="secondary"
@@ -291,7 +317,7 @@ export function CompareOwnedClient({
         >
           {refreshing ? "추출 중…" : "추출/갱신"}
         </Button>
-        {result?.cache_hit && year != null ? (
+        {hasResult && year != null ? (
           <Button type="button" variant="outline" asChild>
             <a
               href={`/api/settlements/compare-owned/export?year=${year}`}
@@ -306,17 +332,25 @@ export function CompareOwnedClient({
         </Button>
       </form>
 
-      {result?.extracted_at ? (
+      {result?.compared_at ? (
         <p className="text-sm text-muted-foreground">
-          마지막 추출: {formatDateTimeInSeoul(result.extracted_at)}
+          마지막 비교: {formatDateTimeInSeoul(result.compared_at)}
+          {result.extracted_at
+            ? ` · 추출: ${formatDateTimeInSeoul(result.extracted_at)}`
+            : null}
         </p>
-      ) : year != null ? (
+      ) : (
         <p className="text-sm text-muted-foreground">
-          해당 연도 추출 캐시가 없습니다. 「추출/갱신」으로 먼저 개설 보유과정을
-          저장하세요.
+          저장된 비교 결과가 없습니다. 「비교」를 실행하면 결과가 저장됩니다.
+          {!result?.extracted_at
+            ? " (추출 캐시가 없으면 먼저 「추출/갱신」이 필요합니다.)"
+            : null}
         </p>
-      ) : null}
+      )}
 
+      {compareError ? (
+        <p className="text-sm text-destructive">{compareError}</p>
+      ) : null}
       {refreshError ? (
         <p className="text-sm text-destructive">{refreshError}</p>
       ) : null}
@@ -338,7 +372,7 @@ export function CompareOwnedClient({
         </div>
       ) : null}
 
-      {result?.cache_hit ? (
+      {hasResult && result ? (
         <Tabs value={tab} onValueChange={onTabChange}>
           <TabsList>
             <TabsTrigger value="unsettled">
@@ -375,10 +409,6 @@ export function CompareOwnedClient({
             ) : null}
           </TabsContent>
         </Tabs>
-      ) : !error && year == null ? (
-        <p className="text-sm text-muted-foreground">
-          연도를 선택하고 비교를 실행하세요.
-        </p>
       ) : null}
 
       <Dialog

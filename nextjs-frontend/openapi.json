@@ -2584,8 +2584,9 @@
         "tags": [
           "settlements"
         ],
-        "summary": "Compare Owned With Settlements",
-        "operationId": "compare_owned_with_settlements",
+        "summary": "Get Owned Settlement Compare",
+        "description": "\uc800\uc7a5\ub41c \ube44\uad50 \uacb0\uacfc \uc694\uc57d \uc870\ud68c (\uc7ac\ubd84\ub958\ud558\uc9c0 \uc54a\uc74c).",
+        "operationId": "get_owned_settlement_compare",
         "security": [
           {
             "OAuth2PasswordBearer": []
@@ -2600,10 +2601,60 @@
               "type": "integer",
               "maximum": 2100,
               "minimum": 2000,
-              "description": "\ube44\uad50 \uc5f0\ub3c4(\ud6c8\ub828\uc2dc\uc791\uc77c/\uad50\uc721\uae30\uac04)",
+              "description": "\ube44\uad50 \uc5f0\ub3c4",
               "title": "Year"
             },
-            "description": "\ube44\uad50 \uc5f0\ub3c4(\ud6c8\ub828\uc2dc\uc791\uc77c/\uad50\uc721\uae30\uac04)"
+            "description": "\ube44\uad50 \uc5f0\ub3c4"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnedSettlementCompareResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "settlements"
+        ],
+        "summary": "Run Owned Settlement Compare",
+        "description": "\ube44\uad50 \uc2e4\ud589: \ud574\ub2f9 \uc5f0\ub3c4 \uacb0\uacfc\ub97c delete & insert\ub85c \uac31\uc2e0.",
+        "operationId": "run_owned_settlement_compare",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "year",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 2100,
+              "minimum": 2000,
+              "description": "\ube44\uad50 \uc5f0\ub3c4",
+              "title": "Year"
+            },
+            "description": "\ube44\uad50 \uc5f0\ub3c4"
           }
         ],
         "responses": {
@@ -2730,7 +2781,7 @@
           "settlements"
         ],
         "summary": "Export Owned Settlement Compare",
-        "description": "\ube44\uad50 \uacb0\uacfc \uc804\uccb4(\uc694\uc57d + \ubbf8\uc815\uc0b0/\ub9f5\ud551\uc5c6\uc74c/\uc815\uc0b0\ub428)\ub97c \uc2dc\ud2b8\ubcc4 xlsx\ub85c \ub0b4\ubcf4\ub0b8\ub2e4.",
+        "description": "\uc800\uc7a5\ub41c \ube44\uad50 \uacb0\uacfc \ud14c\uc774\ube14\uc744 \uc2dc\ud2b8\ubcc4 xlsx\ub85c \ub0b4\ubcf4\ub0b8\ub2e4.",
         "operationId": "export_owned_settlement_compare",
         "security": [
           {
@@ -4633,6 +4684,11 @@
             "type": "integer",
             "title": "Unmapped"
           },
+          "has_result": {
+            "type": "boolean",
+            "title": "Has Result",
+            "default": false
+          },
           "cache_hit": {
             "type": "boolean",
             "title": "Cache Hit",
@@ -4649,6 +4705,18 @@
               }
             ],
             "title": "Extracted At"
+          },
+          "compared_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compared At"
           }
         },
         "type": "object",

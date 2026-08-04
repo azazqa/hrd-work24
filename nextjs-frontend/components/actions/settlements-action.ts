@@ -51,8 +51,10 @@ export type OwnedSettlementCompareResult = {
   matched: number;
   unsettled: number;
   unmapped: number;
+  has_result: boolean;
   cache_hit: boolean;
   extracted_at: string | null;
+  compared_at: string | null;
 };
 
 export type OwnedSettlementCompareItemsPage = {
@@ -144,6 +146,41 @@ export async function compareOwnedSettlements(
 
   if (!res.ok) {
     let message = `비교에 실패했습니다. (HTTP ${res.status})`;
+    try {
+      const body = (await res.json()) as { detail?: unknown };
+      message = formatApiError(body.detail) || message;
+    } catch {
+      /* ignore */
+    }
+    return { message };
+  }
+
+  return (await res.json()) as OwnedSettlementCompareResult;
+}
+
+export async function runOwnedSettlementCompare(
+  year: number,
+): Promise<OwnedSettlementCompareResult | { message: string }> {
+  const baseURL = process.env.API_BASE_URL;
+  if (!baseURL) {
+    return { message: "API_BASE_URL is not configured" };
+  }
+
+  const token = await requireAccessToken();
+  const q = new URLSearchParams();
+  q.set("year", String(year));
+
+  const res = await fetch(
+    `${baseURL}/settlements/compare-owned?${q.toString()}`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    },
+  );
+
+  if (!res.ok) {
+    let message = `비교 실행에 실패했습니다. (HTTP ${res.status})`;
     try {
       const body = (await res.json()) as { detail?: unknown };
       message = formatApiError(body.detail) || message;

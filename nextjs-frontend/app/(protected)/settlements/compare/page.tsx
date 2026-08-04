@@ -4,6 +4,7 @@ import {
   type OwnedSettlementCompareStatus,
 } from "@/components/actions/settlements-action";
 import { getSettlementCompareYearOptions } from "@/lib/date-utils";
+import { redirect } from "next/navigation";
 
 import { CompareOwnedClient } from "./compare-client";
 
@@ -25,12 +26,22 @@ interface PageProps {
 export default async function CompareOwnedPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const yearOptions = getSettlementCompareYearOptions();
+  const defaultYear = yearOptions[0] ?? new Date().getFullYear();
   const yearRaw = params.year?.trim();
   const yearNum = yearRaw ? Number(yearRaw) : undefined;
   const year =
     yearNum != null && Number.isFinite(yearNum) && yearOptions.includes(yearNum)
       ? yearNum
-      : undefined;
+      : defaultYear;
+
+  if (!yearRaw || yearNum !== year) {
+    const q = new URLSearchParams();
+    q.set("year", String(year));
+    q.set("tab", "unsettled");
+    q.set("page", "1");
+    q.set("size", params.size?.trim() || "50");
+    redirect(`/settlements/compare?${q.toString()}`);
+  }
 
   const tabRaw = (params.tab ?? "unsettled").trim();
   const tab: OwnedSettlementCompareStatus = TABS.includes(
@@ -52,19 +63,17 @@ export default async function CompareOwnedPage({ searchParams }: PageProps) {
   let itemsPage = null;
   let error: string | null = null;
 
-  if (year != null) {
-    const data = await compareOwnedSettlements(year);
-    if ("message" in data) {
-      error = data.message;
-    } else {
-      result = data;
-      if (data.cache_hit) {
-        const items = await fetchCompareOwnedItems(year, tab, page, size);
-        if ("message" in items) {
-          error = items.message;
-        } else {
-          itemsPage = items;
-        }
+  const data = await compareOwnedSettlements(year);
+  if ("message" in data) {
+    error = data.message;
+  } else {
+    result = data;
+    if (data.has_result || data.cache_hit) {
+      const items = await fetchCompareOwnedItems(year, tab, page, size);
+      if ("message" in items) {
+        error = items.message;
+      } else {
+        itemsPage = items;
       }
     }
   }

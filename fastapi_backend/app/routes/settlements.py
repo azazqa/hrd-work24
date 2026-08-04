@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import logging
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
 
@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from fastapi_pagination.ext.sqlalchemy import apaginate
 from openpyxl import Workbook, load_workbook
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import and_, case, exists, func, literal, select, update
+from sqlalchemy import and_, case, delete, exists, func, literal, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -21,6 +21,7 @@ from app.database import get_async_session
 from app.models import (
     ClientNameMapping,
     OwnedCourseOpening,
+    OwnedSettlementCompareResultRow,
     SchedulerJob,
     SchedulerJobQueue,
     Settlement,
@@ -524,8 +525,10 @@ class OwnedSettlementCompareResult(BaseModel):
     matched: int
     unsettled: int
     unmapped: int
-    cache_hit: bool = False
+    has_result: bool = False
+    cache_hit: bool = False  # has_result와 동일 (기존 프론트 호환)
     extracted_at: datetime | None = None
+    compared_at: datetime | None = None
 
 
 class OwnedOpeningExtractQueueRead(BaseModel):
@@ -650,23 +653,6 @@ def _compare_base_stmt(year: int):
             OwnedCourseOpening.year == year,
         )
     )
-
-
-def _transform_compare_items(rows: list[Any]) -> list[OwnedSettlementCompareItem]:
-    items: list[OwnedSettlementCompareItem] = []
-    for row in rows:
-        items.append(
-            OwnedSettlementCompareItem(
-                institution_name=row.institution_name,
-                client_name=row.client_name,
-                course_name=row.course_name,
-                tra_start_date=_format_date_cell(row.tra_start_date),
-                tra_end_date=_format_date_cell(row.tra_end_date),
-                reg_course_man=row.reg_course_man,
-                status=row.status,
-            )
-        )
-    return items
 
 
 def _normalize_name_for_mapping(value: str | None) -> str:
@@ -893,12 +879,74 @@ async def get_owned_course_opening_refresh_queue(
     return _queue_to_extract_read(row)
 
 
-@router.get("/compare-owned", response_model=OwnedSettlementCompareResult)
-async def compare_owned_with_settlements(
-    year: int = Query(..., ge=2000, le=2100, description="비교 연도(훈련시작일/교육기간)"),
-    session: AsyncSession = Depends(get_async_session),
-    _: User = Depends(current_active_user),
-):
+async def _load_compare_summary(
+    session: AsyncSession, year: int
+) -> OwnedSettlementCompareResult:
+    extracted_at = await session.scalar(
+        select(func.max(OwnedCourseOpening.extracted_at)).where(
+            OwnedCourseOpening.is_delete == False,  # noqa: E712
+            OwnedCourseOpening.year == year,
+        )
+    )
+    counts = (
+        await session.execute(
+            select(
+                func.count().label("total"),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (OwnedSettlementCompareResultRow.status == "matched", 1),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ).label("matched"),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (OwnedSettlementCompareResultRow.status == "unsettled", 1),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ).label("unsettled"),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (OwnedSettlementCompareResultRow.status == "unmapped", 1),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ).label("unmapped"),
+                func.max(OwnedSettlementCompareResultRow.compared_at).label(
+                    "compared_at"
+                ),
+            ).where(
+                OwnedSettlementCompareResultRow.is_delete == False,  # noqa: E712
+                OwnedSettlementCompareResultRow.year == year,
+            )
+        )
+    ).one()
+    total = int(counts.total or 0)
+    has_result = total > 0 or counts.compared_at is not None
+    return OwnedSettlementCompareResult(
+        year=year,
+        total=total,
+        matched=int(counts.matched or 0),
+        unsettled=int(counts.unsettled or 0),
+        unmapped=int(counts.unmapped or 0),
+        has_result=has_result,
+        cache_hit=has_result,
+        extracted_at=extracted_at,
+        compared_at=counts.compared_at,
+    )
+
+
+async def _persist_compare_results(
+    session: AsyncSession, year: int
+) -> OwnedSettlementCompareResult:
+    """자동 맵핑 + openings 분류 후 해당 연도 결과 hard delete & insert."""
     await _auto_register_identity_mappings(session, year)
 
     extracted_at = await session.scalar(
@@ -907,58 +955,94 @@ async def compare_owned_with_settlements(
             OwnedCourseOpening.year == year,
         )
     )
-    cache_hit = extracted_at is not None
-    if not cache_hit:
-        return OwnedSettlementCompareResult(
-            year=year,
-            total=0,
-            matched=0,
-            unsettled=0,
-            unmapped=0,
-            cache_hit=False,
-            extracted_at=None,
+    if extracted_at is None:
+        raise HTTPException(
+            status_code=400,
+            detail="해당 연도 추출 캐시가 없습니다. 먼저 추출/갱신을 실행하세요.",
         )
 
-    status_expr = _compare_status_expr()
-    counts = (
+    classified = (
         await session.execute(
-            select(
-                func.count().label("total"),
-                func.coalesce(
-                    func.sum(case((status_expr == "matched", 1), else_=0)), 0
-                ).label("matched"),
-                func.coalesce(
-                    func.sum(case((status_expr == "unsettled", 1), else_=0)), 0
-                ).label("unsettled"),
-                func.coalesce(
-                    func.sum(case((status_expr == "unmapped", 1), else_=0)), 0
-                ).label("unmapped"),
-            )
-            .select_from(OwnedCourseOpening)
-            .outerjoin(
-                ClientNameMapping,
-                and_(
-                    ClientNameMapping.institution_name
-                    == func.trim(OwnedCourseOpening.institution_name),
-                    ClientNameMapping.is_delete == False,  # noqa: E712
-                ),
-            )
-            .where(
-                OwnedCourseOpening.is_delete == False,  # noqa: E712
-                OwnedCourseOpening.year == year,
+            _compare_base_stmt(year).order_by(
+                OwnedCourseOpening.institution_name.asc().nulls_last(),
+                OwnedCourseOpening.course_name.asc().nulls_last(),
+                OwnedCourseOpening.tra_start_date.asc().nulls_last(),
+                OwnedCourseOpening.id.asc(),
             )
         )
-    ).one()
+    ).all()
+    if len(classified) > MAX_EXPORT_ROWS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"비교 대상이 {MAX_EXPORT_ROWS:,}건을 초과합니다.",
+        )
 
-    return OwnedSettlementCompareResult(
-        year=year,
-        total=int(counts.total or 0),
-        matched=int(counts.matched or 0),
-        unsettled=int(counts.unsettled or 0),
-        unmapped=int(counts.unmapped or 0),
-        cache_hit=True,
-        extracted_at=extracted_at,
+    compared_at = datetime.now(timezone.utc)
+    await session.execute(
+        delete(OwnedSettlementCompareResultRow).where(
+            OwnedSettlementCompareResultRow.year == year
+        )
     )
+    to_insert = [
+        OwnedSettlementCompareResultRow(
+            year=year,
+            status=row.status,
+            institution_name=row.institution_name,
+            client_name=row.client_name,
+            course_name=row.course_name,
+            tra_start_date=row.tra_start_date
+            if isinstance(row.tra_start_date, date)
+            else _normalize_compare_date(row.tra_start_date),
+            tra_end_date=row.tra_end_date
+            if isinstance(row.tra_end_date, date)
+            else _normalize_compare_date(row.tra_end_date),
+            reg_course_man=row.reg_course_man,
+            compared_at=compared_at,
+        )
+        for row in classified
+    ]
+    if to_insert:
+        session.add_all(to_insert)
+    await session.commit()
+
+    return await _load_compare_summary(session, year)
+
+
+def _transform_stored_compare_items(
+    rows: list[OwnedSettlementCompareResultRow],
+) -> list[OwnedSettlementCompareItem]:
+    return [
+        OwnedSettlementCompareItem(
+            institution_name=row.institution_name,
+            client_name=row.client_name,
+            course_name=row.course_name,
+            tra_start_date=_format_date_cell(row.tra_start_date),
+            tra_end_date=_format_date_cell(row.tra_end_date),
+            reg_course_man=row.reg_course_man,
+            status=row.status,  # type: ignore[arg-type]
+        )
+        for row in rows
+    ]
+
+
+@router.get("/compare-owned", response_model=OwnedSettlementCompareResult)
+async def get_owned_settlement_compare(
+    year: int = Query(..., ge=2000, le=2100, description="비교 연도"),
+    session: AsyncSession = Depends(get_async_session),
+    _: User = Depends(current_active_user),
+):
+    """저장된 비교 결과 요약 조회 (재분류하지 않음)."""
+    return await _load_compare_summary(session, year)
+
+
+@router.post("/compare-owned", response_model=OwnedSettlementCompareResult)
+async def run_owned_settlement_compare(
+    year: int = Query(..., ge=2000, le=2100, description="비교 연도"),
+    session: AsyncSession = Depends(get_async_session),
+    _: User = Depends(current_active_user),
+):
+    """비교 실행: 해당 연도 결과를 delete & insert로 갱신."""
+    return await _persist_compare_results(session, year)
 
 
 @router.get("/compare-owned/items", response_model=Page[OwnedSettlementCompareItem])
@@ -970,26 +1054,29 @@ async def list_owned_settlement_compare_items(
     session: AsyncSession = Depends(get_async_session),
     _: User = Depends(current_active_user),
 ):
-    await _auto_register_identity_mappings(session, year)
-
     if size < 1:
         raise HTTPException(status_code=400, detail="size must be >= 1")
     if size > MAX_PAGE_SIZE:
         raise HTTPException(status_code=400, detail=f"size must be <= {MAX_PAGE_SIZE}")
 
     params = Params(page=page, size=size)
-    status_expr = _compare_status_expr()
     stmt = (
-        _compare_base_stmt(year)
-        .where(status_expr == status)
+        select(OwnedSettlementCompareResultRow)
+        .where(
+            OwnedSettlementCompareResultRow.is_delete == False,  # noqa: E712
+            OwnedSettlementCompareResultRow.year == year,
+            OwnedSettlementCompareResultRow.status == status,
+        )
         .order_by(
-            OwnedCourseOpening.institution_name.asc().nulls_last(),
-            OwnedCourseOpening.course_name.asc().nulls_last(),
-            OwnedCourseOpening.tra_start_date.asc().nulls_last(),
-            OwnedCourseOpening.id.asc(),
+            OwnedSettlementCompareResultRow.institution_name.asc().nulls_last(),
+            OwnedSettlementCompareResultRow.course_name.asc().nulls_last(),
+            OwnedSettlementCompareResultRow.tra_start_date.asc().nulls_last(),
+            OwnedSettlementCompareResultRow.id.asc(),
         )
     )
-    return await apaginate(session, stmt, params, transformer=_transform_compare_items)
+    return await apaginate(
+        session, stmt, params, transformer=_transform_stored_compare_items
+    )
 
 
 _COMPARE_EXPORT_HEADERS = [
@@ -1008,7 +1095,7 @@ _COMPARE_STATUS_SHEETS: list[tuple[CompareStatus, str]] = [
 ]
 
 
-def _append_compare_rows(ws, rows: list[Any]) -> None:
+def _append_compare_rows(ws, rows: list[OwnedSettlementCompareResultRow]) -> None:
     ws.append(list(_COMPARE_EXPORT_HEADERS))
     for row in rows:
         ws.append(
@@ -1029,54 +1116,14 @@ async def export_owned_settlement_compare(
     session: AsyncSession = Depends(get_async_session),
     _: User = Depends(current_active_user),
 ):
-    """비교 결과 전체(요약 + 미정산/맵핑없음/정산됨)를 시트별 xlsx로 내보낸다."""
-    await _auto_register_identity_mappings(session, year)
-
-    extracted_at = await session.scalar(
-        select(func.max(OwnedCourseOpening.extracted_at)).where(
-            OwnedCourseOpening.is_delete == False,  # noqa: E712
-            OwnedCourseOpening.year == year,
-        )
-    )
-    if extracted_at is None:
+    """저장된 비교 결과 테이블을 시트별 xlsx로 내보낸다."""
+    summary = await _load_compare_summary(session, year)
+    if not summary.has_result:
         raise HTTPException(
             status_code=404,
-            detail="해당 연도 추출 캐시가 없습니다. 먼저 추출/갱신을 실행하세요.",
+            detail="해당 연도 비교 결과가 없습니다. 먼저 비교를 실행하세요.",
         )
-
-    status_expr = _compare_status_expr()
-    counts = (
-        await session.execute(
-            select(
-                func.count().label("total"),
-                func.coalesce(
-                    func.sum(case((status_expr == "matched", 1), else_=0)), 0
-                ).label("matched"),
-                func.coalesce(
-                    func.sum(case((status_expr == "unsettled", 1), else_=0)), 0
-                ).label("unsettled"),
-                func.coalesce(
-                    func.sum(case((status_expr == "unmapped", 1), else_=0)), 0
-                ).label("unmapped"),
-            )
-            .select_from(OwnedCourseOpening)
-            .outerjoin(
-                ClientNameMapping,
-                and_(
-                    ClientNameMapping.institution_name
-                    == func.trim(OwnedCourseOpening.institution_name),
-                    ClientNameMapping.is_delete == False,  # noqa: E712
-                ),
-            )
-            .where(
-                OwnedCourseOpening.is_delete == False,  # noqa: E712
-                OwnedCourseOpening.year == year,
-            )
-        )
-    ).one()
-
-    total = int(counts.total or 0)
-    if total > MAX_EXPORT_ROWS:
+    if summary.total > MAX_EXPORT_ROWS:
         raise HTTPException(
             status_code=400,
             detail=f"내보낼 데이터가 {MAX_EXPORT_ROWS:,}건을 초과합니다.",
@@ -1084,16 +1131,21 @@ async def export_owned_settlement_compare(
 
     all_rows = (
         await session.execute(
-            _compare_base_stmt(year).order_by(
-                OwnedCourseOpening.institution_name.asc().nulls_last(),
-                OwnedCourseOpening.course_name.asc().nulls_last(),
-                OwnedCourseOpening.tra_start_date.asc().nulls_last(),
-                OwnedCourseOpening.id.asc(),
+            select(OwnedSettlementCompareResultRow)
+            .where(
+                OwnedSettlementCompareResultRow.is_delete == False,  # noqa: E712
+                OwnedSettlementCompareResultRow.year == year,
+            )
+            .order_by(
+                OwnedSettlementCompareResultRow.institution_name.asc().nulls_last(),
+                OwnedSettlementCompareResultRow.course_name.asc().nulls_last(),
+                OwnedSettlementCompareResultRow.tra_start_date.asc().nulls_last(),
+                OwnedSettlementCompareResultRow.id.asc(),
             )
         )
-    ).all()
+    ).scalars().all()
 
-    by_status: dict[str, list[Any]] = {
+    by_status: dict[str, list[OwnedSettlementCompareResultRow]] = {
         "matched": [],
         "unsettled": [],
         "unmapped": [],
@@ -1106,14 +1158,14 @@ async def export_owned_settlement_compare(
     ws_summary.title = "요약"
     ws_summary.append(["항목", "값"])
     ws_summary.append(["연도", year])
-    ws_summary.append(["전체", total])
-    ws_summary.append(["정산됨", int(counts.matched or 0)])
-    ws_summary.append(["미정산", int(counts.unsettled or 0)])
-    ws_summary.append(["맵핑 없음", int(counts.unmapped or 0)])
+    ws_summary.append(["전체", summary.total])
+    ws_summary.append(["정산됨", summary.matched])
+    ws_summary.append(["미정산", summary.unsettled])
+    ws_summary.append(["맵핑 없음", summary.unmapped])
     ws_summary.append(
         [
-            "추출일시",
-            extracted_at.isoformat() if extracted_at is not None else None,
+            "비교일시",
+            summary.compared_at.isoformat() if summary.compared_at else None,
         ]
     )
 

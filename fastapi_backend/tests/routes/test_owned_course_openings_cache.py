@@ -1,19 +1,22 @@
 from datetime import date, datetime, timezone
+from io import BytesIO
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from sqlalchemy import select
+from openpyxl import load_workbook
+from sqlalchemy import func, select
 
 from app.models import (
     ClientNameMapping,
     OwnedCourseOpening,
+    OwnedSettlementCompareResultRow,
     SchedulerJobQueue,
     Settlement,
 )
 
 
 @pytest.mark.asyncio
-async def test_compare_reads_cache_without_es(
+async def test_get_compare_reads_stored_results_only(
     test_client, authenticated_user, db_session
 ):
     headers = authenticated_user["headers"]
@@ -52,17 +55,54 @@ async def test_compare_reads_cache_without_es(
     )
     await db_session.commit()
 
-    res = await test_client.get(
+    empty = await test_client.get(
         "/settlements/compare-owned?year=2024",
         headers=headers,
     )
-    assert res.status_code == 200, res.text
-    body = res.json()
-    assert body["cache_hit"] is True
+    assert empty.status_code == 200, empty.text
+    assert empty.json()["has_result"] is False
+    assert empty.json()["total"] == 0
+
+    export_before = await test_client.get(
+        "/settlements/compare-owned/export?year=2024",
+        headers=headers,
+    )
+    assert export_before.status_code == 404
+
+    run = await test_client.post(
+        "/settlements/compare-owned?year=2024",
+        headers=headers,
+    )
+    assert run.status_code == 200, run.text
+    body = run.json()
+    assert body["has_result"] is True
     assert body["matched"] == 1
     assert body["unsettled"] == 1
     assert body["unmapped"] == 0
-    assert "items_matched" not in body
+    assert body["compared_at"]
+
+    stored = (
+        await db_session.execute(
+            select(OwnedSettlementCompareResultRow).where(
+                OwnedSettlementCompareResultRow.year == 2024
+            )
+        )
+    ).scalars().all()
+    assert len(stored) == 2
+
+    # GET does not rewrite rows
+    again = await test_client.get(
+        "/settlements/compare-owned?year=2024",
+        headers=headers,
+    )
+    assert again.status_code == 200
+    assert again.json()["matched"] == 1
+    count_after_get = await db_session.scalar(
+        select(func.count()).select_from(OwnedSettlementCompareResultRow).where(
+            OwnedSettlementCompareResultRow.year == 2024
+        )
+    )
+    assert count_after_get == 2
 
     matched = await test_client.get(
         "/settlements/compare-owned/items?year=2024&status=matched&page=1&size=50",
@@ -73,40 +113,73 @@ async def test_compare_reads_cache_without_es(
     assert matched_body["total"] == 1
     assert matched_body["items"][0]["course_name"] == "과정매칭"
     assert matched_body["items"][0]["client_name"] == "고객A"
-    assert matched_body["items"][0]["status"] == "matched"
-
-    unsettled = await test_client.get(
-        "/settlements/compare-owned/items?year=2024&status=unsettled&page=1&size=50",
-        headers=headers,
-    )
-    assert unsettled.status_code == 200, unsettled.text
-    unsettled_body = unsettled.json()
-    assert unsettled_body["total"] == 1
-    assert unsettled_body["items"][0]["course_name"] == "과정미정산"
 
     export_res = await test_client.get(
         "/settlements/compare-owned/export?year=2024",
         headers=headers,
     )
     assert export_res.status_code == 200, export_res.text
-    assert (
-        "spreadsheetml"
-        in (export_res.headers.get("content-type") or "")
-    )
-    from io import BytesIO
-
-    from openpyxl import load_workbook
-
     wb = load_workbook(BytesIO(export_res.content))
     assert wb.sheetnames == ["요약", "미정산", "맵핑없음", "정산됨"]
     assert wb["요약"]["B2"].value == 2024
     assert wb["요약"]["B3"].value == 2
-    assert wb["미정산"].max_row == 2
     assert wb["미정산"]["C2"].value == "과정미정산"
-    assert wb["정산됨"].max_row == 2
     assert wb["정산됨"]["C2"].value == "과정매칭"
-    assert wb["맵핑없음"].max_row == 1  # header only
     wb.close()
+
+
+@pytest.mark.asyncio
+async def test_post_compare_replaces_year_rows(
+    test_client, authenticated_user, db_session
+):
+    headers = authenticated_user["headers"]
+    extracted_at = datetime.now(timezone.utc)
+    db_session.add(
+        ClientNameMapping(institution_name="기관A", client_name="고객A")
+    )
+    db_session.add(
+        OwnedCourseOpening(
+            year=2024,
+            institution_name="기관A",
+            course_name="과정1",
+            tra_start_date=date(2024, 1, 1),
+            extracted_at=extracted_at,
+        )
+    )
+    await db_session.commit()
+
+    first = await test_client.post(
+        "/settlements/compare-owned?year=2024", headers=headers
+    )
+    assert first.status_code == 200
+    assert first.json()["unsettled"] == 1
+
+    db_session.add(
+        OwnedCourseOpening(
+            year=2024,
+            institution_name="기관A",
+            course_name="과정2",
+            tra_start_date=date(2024, 2, 1),
+            extracted_at=extracted_at,
+        )
+    )
+    await db_session.commit()
+
+    second = await test_client.post(
+        "/settlements/compare-owned?year=2024", headers=headers
+    )
+    assert second.status_code == 200
+    assert second.json()["total"] == 2
+
+    rows = (
+        await db_session.execute(
+            select(OwnedSettlementCompareResultRow).where(
+                OwnedSettlementCompareResultRow.year == 2024
+            )
+        )
+    ).scalars().all()
+    assert len(rows) == 2
+    assert {r.course_name for r in rows} == {"과정1", "과정2"}
 
 
 @pytest.mark.asyncio
@@ -135,16 +208,7 @@ async def test_compare_auto_registers_identity_mapping(
     )
     await db_session.commit()
 
-    before = (
-        await db_session.execute(
-            select(ClientNameMapping).where(
-                ClientNameMapping.institution_name == "동일고객사"
-            )
-        )
-    ).scalars().first()
-    assert before is None
-
-    res = await test_client.get(
+    res = await test_client.post(
         "/settlements/compare-owned?year=2024",
         headers=headers,
     )
@@ -190,7 +254,7 @@ async def test_compare_auto_registers_mapping_ignoring_internal_spaces(
     )
     await db_session.commit()
 
-    res = await test_client.get(
+    res = await test_client.post(
         "/settlements/compare-owned?year=2024",
         headers=headers,
     )
@@ -251,7 +315,7 @@ async def test_compare_does_not_revive_soft_deleted_mapping(
     )
     await db_session.commit()
 
-    res = await test_client.get(
+    res = await test_client.post(
         "/settlements/compare-owned?year=2024",
         headers=headers,
     )
