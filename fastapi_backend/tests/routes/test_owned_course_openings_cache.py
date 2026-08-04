@@ -285,6 +285,53 @@ def test_normalize_name_for_mapping_removes_all_whitespace():
     assert _normalize_name_for_mapping(None) == ""
 
 
+def test_aggregate_owned_opening_rows_sums_headcount_and_skips_non_numeric():
+    from scheduler.jobs.owned_course_opening_extract import (
+        _aggregate_owned_opening_rows,
+    )
+
+    extracted_at = datetime(2024, 6, 1, tzinfo=timezone.utc)
+    rows = _aggregate_owned_opening_rows(
+        [
+            {
+                "institution_name": "A",
+                "course_name": "과정",
+                "tra_start_date": "2024-06-30",
+                "tra_end_date": "2024-07-30",
+                "reg_course_man": "88",
+            },
+            {
+                "institution_name": "A",
+                "course_name": "과정",
+                "tra_start_date": "2024-06-30",
+                "tra_end_date": "2024-07-30",
+                "reg_course_man": "115",
+            },
+            {
+                "institution_name": "A",
+                "course_name": "과정",
+                "tra_start_date": "2024-06-30",
+                "tra_end_date": "2024-07-30",
+                "reg_course_man": "N/A",
+            },
+            {
+                "institution_name": "B",
+                "course_name": "다른과정",
+                "tra_start_date": "2024-01-01",
+                "tra_end_date": None,
+                "reg_course_man": "x",
+            },
+        ],
+        year=2024,
+        extracted_at=extracted_at,
+    )
+    assert len(rows) == 2
+    by_inst = {r.institution_name: r for r in rows}
+    assert by_inst["A"].reg_course_man == "203"
+    assert by_inst["A"].tra_start_date == date(2024, 6, 30)
+    assert by_inst["B"].reg_course_man is None
+
+
 @pytest.mark.asyncio
 async def test_compare_does_not_revive_soft_deleted_mapping(
     test_client, authenticated_user, db_session
@@ -396,7 +443,21 @@ async def test_extract_replaces_year_cache(db_session):
             "tra_start_date": "2024-03-01",
             "tra_end_date": "2024-03-31",
             "reg_course_man": "5",
-        }
+        },
+        {
+            "institution_name": "신기관",
+            "course_name": "신과정",
+            "tra_start_date": "2024-03-01",
+            "tra_end_date": "2024-03-31",
+            "reg_course_man": "7",
+        },
+        {
+            "institution_name": "타기관",
+            "course_name": "타과정",
+            "tra_start_date": "2024-04-01",
+            "tra_end_date": "2024-04-30",
+            "reg_course_man": "3",
+        },
     ]
 
     with (
@@ -424,9 +485,11 @@ async def test_extract_replaces_year_cache(db_session):
     build_body.assert_called_once_with(
         ["신과정"], 2024, 0.0, has_reg_course_man=True
     )
-    assert result["row_count"] == 1
+    assert result["row_count"] == 2
+    assert result["source_row_count"] == 3
     await db_session.refresh(q)
-    assert q.payload["row_count"] == 1
+    assert q.payload["row_count"] == 2
+    assert q.payload["source_row_count"] == 3
     assert q.payload.get("extracted_at")
 
     rows_2024 = (
@@ -434,6 +497,8 @@ async def test_extract_replaces_year_cache(db_session):
             select(OwnedCourseOpening).where(OwnedCourseOpening.year == 2024)
         )
     ).scalars().all()
-    assert len(rows_2024) == 1
-    assert rows_2024[0].course_name == "신과정"
-    assert rows_2024[0].institution_name == "신기관"
+    assert len(rows_2024) == 2
+    by_course = {r.course_name: r for r in rows_2024}
+    assert by_course["신과정"].institution_name == "신기관"
+    assert by_course["신과정"].reg_course_man == "12"
+    assert by_course["타과정"].reg_course_man == "3"
