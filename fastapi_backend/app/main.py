@@ -8,6 +8,7 @@ from app.routes.auth_refresh import router as auth_refresh_router
 from app.routes.client_mappings import router as client_mappings_router
 from app.routes.courses import router as courses_router
 from app.routes.owned_courses import router as owned_courses_router
+from app.routes.separate_settlements import router as separate_settlements_router
 from app.routes.settlements import router as settlements_router
 from app.routes.work24_api_logs import router as work24_api_logs_router
 from app.schemas import UserRead, UserUpdate
@@ -65,6 +66,13 @@ app.include_router(
     owned_courses_router,
     prefix="/owned-courses",
     tags=["owned-courses"],
+)
+
+# /settlements/separate 를 /settlements 일반 라우트보다 먼저 등록
+app.include_router(
+    separate_settlements_router,
+    prefix="/settlements/separate",
+    tags=["separate-settlements"],
 )
 
 app.include_router(

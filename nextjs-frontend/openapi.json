@@ -2278,6 +2278,219 @@
         }
       }
     },
+    "/settlements/separate": {
+      "get": {
+        "tags": [
+          "separate-settlements"
+        ],
+        "summary": "List Separate Settlements",
+        "operationId": "list_separate_settlements",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Page size",
+              "default": 50,
+              "title": "Size"
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "\uacc4\uc0b0\uc11c(\uc218\ucde8)\ub9c8\uac10\uc77c \uc5f0\ub3c4",
+              "title": "Year"
+            },
+            "description": "\uacc4\uc0b0\uc11c(\uc218\ucde8)\ub9c8\uac10\uc77c \uc5f0\ub3c4"
+          },
+          {
+            "name": "client_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "\uace0\uac1d\uc0ac \uac80\uc0c9",
+              "title": "Client Name"
+            },
+            "description": "\uace0\uac1d\uc0ac \uac80\uc0c9"
+          },
+          {
+            "name": "course_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "\uacfc\uc815\uba85 \uac80\uc0c9",
+              "title": "Course Name"
+            },
+            "description": "\uacfc\uc815\uba85 \uac80\uc0c9"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SeparateSettlementListItem_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settlements/separate/import/template": {
+      "get": {
+        "tags": [
+          "separate-settlements"
+        ],
+        "summary": "Download Import Template",
+        "operationId": "download_import_template",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/settlements/separate/export": {
+      "get": {
+        "tags": [
+          "separate-settlements"
+        ],
+        "summary": "Export Separate Settlements",
+        "operationId": "export_separate_settlements",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/settlements/separate/import": {
+      "post": {
+        "tags": [
+          "separate-settlements"
+        ],
+        "summary": "Import Separate Settlements",
+        "operationId": "import_separate_settlements",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_separate-settlements-import_separate_settlements"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeparateSettlementImportResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/settlements": {
       "get": {
         "tags": [
@@ -3281,6 +3494,20 @@
           "file"
         ],
         "title": "Body_owned-courses-import_owned_courses"
+      },
+      "Body_separate-settlements-import_separate_settlements": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_separate-settlements-import_separate_settlements"
       },
       "Body_settlements-import_settlements": {
         "properties": {
@@ -5158,6 +5385,72 @@
         ],
         "title": "Page[SchedulerJobQueueRead]"
       },
+      "Page_SeparateSettlementListItem_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SeparateSettlementListItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "pages": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "size"
+        ],
+        "title": "Page[SeparateSettlementListItem]"
+      },
       "Page_SettlementListItem_": {
         "properties": {
           "items": {
@@ -5670,6 +5963,282 @@
         },
         "type": "object",
         "title": "SchedulerJobUpdate"
+      },
+      "SeparateSettlementImportError": {
+        "properties": {
+          "row": {
+            "type": "integer",
+            "title": "Row"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "row",
+          "message"
+        ],
+        "title": "SeparateSettlementImportError"
+      },
+      "SeparateSettlementImportResult": {
+        "properties": {
+          "deleted": {
+            "type": "integer",
+            "title": "Deleted"
+          },
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/SeparateSettlementImportError"
+            },
+            "type": "array",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "deleted",
+          "created",
+          "failed"
+        ],
+        "title": "SeparateSettlementImportResult"
+      },
+      "SeparateSettlementListItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "invoice_deadline_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Deadline Date"
+          },
+          "invoice_deadline_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Deadline Year"
+          },
+          "sales_rep": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sales Rep"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "client_name": {
+            "type": "string",
+            "title": "Client Name"
+          },
+          "business_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Business Detail"
+          },
+          "course_name": {
+            "type": "string",
+            "title": "Course Name"
+          },
+          "base_revenue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Revenue"
+          },
+          "settlement_rate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settlement Rate"
+          },
+          "settlement_rate_raw": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settlement Rate Raw"
+          },
+          "calculated_amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calculated Amount"
+          },
+          "contract_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contract Period"
+          },
+          "deduction_amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deduction Amount"
+          },
+          "final_amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Amount"
+          },
+          "invoice_item": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Item"
+          },
+          "supply_amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supply Amount"
+          },
+          "tax_amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tax Amount"
+          },
+          "total_amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Amount"
+          },
+          "invoice_issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Issuer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "invoice_deadline_date",
+          "invoice_deadline_year",
+          "sales_rep",
+          "category",
+          "client_name",
+          "business_detail",
+          "course_name",
+          "base_revenue",
+          "settlement_rate",
+          "settlement_rate_raw",
+          "calculated_amount",
+          "contract_period",
+          "deduction_amount",
+          "final_amount",
+          "invoice_item",
+          "supply_amount",
+          "tax_amount",
+          "total_amount",
+          "invoice_issuer"
+        ],
+        "title": "SeparateSettlementListItem"
       },
       "SettlementImportError": {
         "properties": {

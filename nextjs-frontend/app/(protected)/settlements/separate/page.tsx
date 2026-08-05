@@ -1,10 +1,13 @@
-import { fetchSettlements } from "@/components/actions/settlements-action";
+import { fetchSeparateSettlements } from "@/components/actions/settlements-action";
 import { PagePagination } from "@/components/page-pagination";
 
-import { SettlementsList, SettlementsListHeader } from "./settlements-list";
-import { SettlementsSearchForm } from "./settlements-search-form";
+import {
+  SeparateSettlementsList,
+  SeparateSettlementsListHeader,
+} from "./separate-settlements-list";
+import { SeparateSettlementsSearchForm } from "./separate-settlements-search-form";
 
-interface SettlementsPageProps {
+interface SeparateSettlementsPageProps {
   searchParams: Promise<{
     page?: string;
     size?: string;
@@ -14,7 +17,9 @@ interface SettlementsPageProps {
   }>;
 }
 
-function buildExtraQuery(p: Awaited<SettlementsPageProps["searchParams"]>): string {
+function buildExtraQuery(
+  p: Awaited<SeparateSettlementsPageProps["searchParams"]>,
+): string {
   const parts: string[] = [];
   const add = (k: string, v: string | undefined) => {
     const t = v?.trim();
@@ -26,7 +31,9 @@ function buildExtraQuery(p: Awaited<SettlementsPageProps["searchParams"]>): stri
   return parts.join("&");
 }
 
-export default async function SettlementsPage({ searchParams }: SettlementsPageProps) {
+export default async function SeparateSettlementsPage({
+  searchParams,
+}: SeparateSettlementsPageProps) {
   const params = await searchParams;
   const page = Number(params.page) || 1;
   const size = Number(params.size) || 20;
@@ -37,7 +44,7 @@ export default async function SettlementsPage({ searchParams }: SettlementsPageP
   const year =
     yearNum != null && Number.isFinite(yearNum) ? yearNum : undefined;
 
-  const data = await fetchSettlements(page, size, {
+  const data = await fetchSeparateSettlements(page, size, {
     year,
     client_name: params.client_name,
     course_name: params.course_name,
@@ -52,14 +59,15 @@ export default async function SettlementsPage({ searchParams }: SettlementsPageP
   return (
     <div>
       <div className="mb-6">
-        <h2 className="text-2xl font-semibold">일반 정산</h2>
+        <h2 className="text-2xl font-semibold">별도 정산</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          정산 엑셀을 년도별로 업로드하고 고객사·과정명으로 조회합니다.
+          임대 과정 등 별도 정산 엑셀을 업로드하고 고객사·과정명으로 조회합니다.
+          업로드 시 기존 데이터가 전체 교체됩니다.
         </p>
       </div>
 
       <section className="rounded-lg bg-white p-6 shadow-lg dark:bg-gray-900">
-        <SettlementsSearchForm
+        <SeparateSettlementsSearchForm
           size={size}
           initial={{
             year: params.year,
@@ -70,11 +78,11 @@ export default async function SettlementsPage({ searchParams }: SettlementsPageP
       </section>
 
       <section className="mt-8 rounded-lg bg-white p-6 shadow-lg dark:bg-gray-900">
-        <SettlementsListHeader />
+        <SeparateSettlementsListHeader />
         {"message" in data ? (
           <p className="text-sm text-destructive">{data.message}</p>
         ) : (
-          <SettlementsList items={data.items ?? []} />
+          <SeparateSettlementsList items={data.items ?? []} />
         )}
 
         <PagePagination
@@ -82,7 +90,7 @@ export default async function SettlementsPage({ searchParams }: SettlementsPageP
           totalPages={Math.max(1, totalPages)}
           pageSize={size}
           totalItems={totalItems}
-          basePath="/settlements"
+          basePath="/settlements/separate"
           extraQuery={extraQuery}
         />
       </section>

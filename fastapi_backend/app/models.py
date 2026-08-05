@@ -211,6 +211,33 @@ class SettlementConsolidated(ViewBase):
     sales_rep = Column(String(100), primary_key=True, nullable=True)
 
 
+class SeparateSettlement(Base):
+    """별도 정산 (임대 과정 등, 엑셀 전체 교체 import)."""
+
+    __tablename__ = "separate_settlements"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    invoice_deadline_date = Column(Date, nullable=True, index=True)
+    invoice_deadline_year = Column(Integer, nullable=True, index=True)
+    sales_rep = Column(String(100), nullable=True)
+    category = Column(String(100), nullable=True)
+    client_name = Column(String(255), nullable=False, index=True)
+    business_detail = Column(String(500), nullable=True)
+    course_name = Column(String(500), nullable=False, index=True)
+    base_revenue = Column(Numeric(18, 4), nullable=True)
+    settlement_rate = Column(Numeric(10, 6), nullable=True)
+    settlement_rate_raw = Column(String(100), nullable=True)
+    calculated_amount = Column(Numeric(18, 4), nullable=True)
+    contract_period = Column(String(100), nullable=True)
+    deduction_amount = Column(Numeric(18, 4), nullable=True)
+    final_amount = Column(Numeric(18, 4), nullable=True)
+    invoice_item = Column(String(500), nullable=True)
+    supply_amount = Column(Numeric(18, 4), nullable=True)
+    tax_amount = Column(Numeric(18, 4), nullable=True)
+    total_amount = Column(Numeric(18, 4), nullable=True)
+    invoice_issuer = Column(String(255), nullable=True)
+
+
 class ClientNameMapping(Base):
     """훈련기관명(Work24 instNm) → 정산 고객사명 맵핑."""
 

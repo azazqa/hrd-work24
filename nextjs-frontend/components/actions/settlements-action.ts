@@ -32,6 +32,37 @@ export type SettlementListSearch = {
   course_name?: string;
 };
 
+export type SeparateSettlementListItem = {
+  id: number;
+  invoice_deadline_date: string | null;
+  invoice_deadline_year: number | null;
+  sales_rep: string | null;
+  category: string | null;
+  client_name: string;
+  business_detail: string | null;
+  course_name: string;
+  base_revenue: string | number | null;
+  settlement_rate: string | number | null;
+  settlement_rate_raw: string | null;
+  calculated_amount: string | number | null;
+  contract_period: string | null;
+  deduction_amount: string | number | null;
+  final_amount: string | number | null;
+  invoice_item: string | null;
+  supply_amount: string | number | null;
+  tax_amount: string | number | null;
+  total_amount: string | number | null;
+  invoice_issuer: string | null;
+};
+
+export type SeparateSettlementListPage = {
+  items: SeparateSettlementListItem[];
+  total?: number | null;
+  page?: number | null;
+  size?: number | null;
+  pages?: number | null;
+};
+
 export type OwnedSettlementCompareItem = {
   institution_name: string | null;
   client_name: string | null;
@@ -123,6 +154,43 @@ export async function fetchSettlements(
   }
 
   return (await res.json()) as SettlementListPage;
+}
+
+export async function fetchSeparateSettlements(
+  page: number,
+  size: number,
+  search: SettlementListSearch,
+): Promise<SeparateSettlementListPage | { message: string }> {
+  const baseURL = process.env.API_BASE_URL;
+  if (!baseURL) {
+    return { message: "API_BASE_URL is not configured" };
+  }
+
+  const token = await requireAccessToken();
+  const q = new URLSearchParams();
+  q.set("page", String(page));
+  q.set("size", String(size));
+  if (search.year != null) q.set("year", String(search.year));
+  if (search.client_name?.trim()) q.set("client_name", search.client_name.trim());
+  if (search.course_name?.trim()) q.set("course_name", search.course_name.trim());
+
+  const res = await fetch(`${baseURL}/settlements/separate?${q.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    let message = `별도 정산 조회에 실패했습니다. (HTTP ${res.status})`;
+    try {
+      const body = (await res.json()) as { detail?: unknown };
+      message = formatApiError(body.detail) || message;
+    } catch {
+      /* ignore */
+    }
+    return { message };
+  }
+
+  return (await res.json()) as SeparateSettlementListPage;
 }
 
 export async function compareOwnedSettlements(

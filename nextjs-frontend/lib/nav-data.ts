@@ -36,8 +36,12 @@ export const navMain: NavItem[] = [
     hasChildren: true,
     items: [
       {
-        title: "정산 목록",
+        title: "일반 정산",
         url: "/settlements",
+      },
+      {
+        title: "별도 정산",
+        url: "/settlements/separate",
       },
       {
         title: "고객사 맵핑",

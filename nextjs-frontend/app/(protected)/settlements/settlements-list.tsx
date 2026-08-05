@@ -14,7 +14,7 @@ import { ExcelImportDialog } from "./excel-import-dialog";
 export function SettlementsListHeader() {
   return (
     <div className="mb-4 flex items-center justify-between flex-wrap gap-2">
-      <h2 className="text-xl font-semibold">정산 목록</h2>
+      <h2 className="text-xl font-semibold">일반 정산 목록</h2>
       <div className="flex flex-wrap gap-2">
         <a
           href="/settlements/compare"
