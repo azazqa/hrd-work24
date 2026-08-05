@@ -50,11 +50,11 @@ export function SeparateSettlementsList({ items }: Props) {
       <Table className="[&_td]:text-center">
         <TableHeader>
           <TableRow>
-            <TableHead>계산서(수취)마감일</TableHead>
-            <TableHead>영업대표</TableHead>
             <TableHead>구분</TableHead>
+            <TableHead>계산서(수취)마감일</TableHead>
             <TableHead>고객사</TableHead>
             <TableHead>과정명</TableHead>
+            <TableHead>계약기간</TableHead>
             <TableHead>기준매출액</TableHead>
             <TableHead>정산율</TableHead>
             <TableHead>산출정산액</TableHead>
@@ -73,14 +73,16 @@ export function SeparateSettlementsList({ items }: Props) {
           ) : (
             items.map((row) => (
               <TableRow key={row.id}>
+                <TableCell>{row.category ?? "-"}</TableCell>
                 <TableCell className="whitespace-nowrap">
                   {row.invoice_deadline_date ?? "-"}
                 </TableCell>
-                <TableCell>{row.sales_rep ?? "-"}</TableCell>
-                <TableCell>{row.category ?? "-"}</TableCell>
                 <TableCell className="max-w-[140px]">{row.client_name}</TableCell>
                 <TableCell className="max-w-[240px] text-left">
                   {row.course_name}
+                </TableCell>
+                <TableCell className="max-w-[160px] whitespace-nowrap">
+                  {row.contract_period ?? "-"}
                 </TableCell>
                 <TableCell>{formatAmount(row.base_revenue)}</TableCell>
                 <TableCell>{formatRate(row)}</TableCell>
