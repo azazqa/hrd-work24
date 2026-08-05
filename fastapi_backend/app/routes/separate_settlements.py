@@ -127,13 +127,22 @@ def _resolve_settlement_rate(
     return rate, raw_str
 
 
-def _row_to_fields(row_values: dict[str, Any]) -> dict[str, Any]:
+def _split_course_names(value: Any) -> list[str]:
+    """과정명 셀의 줄바꿈으로 여러 과정을 분리한다."""
+    if value is None:
+        return []
+    text = str(value).replace("\r\n", "\n").replace("\r", "\n")
+    return [part.strip() for part in text.split("\n") if part.strip()]
+
+
+def _row_to_fields(row_values: dict[str, Any]) -> list[dict[str, Any]]:
+    """엑셀 1행 → 과정명 줄바꿈 분리 후 1개 이상 field dict."""
     client_name = _parse_str(row_values.get("client_name"))
     if not client_name:
         raise ValueError("고객사가 비어 있습니다.")
 
-    course_name = _parse_str(row_values.get("course_name"))
-    if not course_name:
+    course_names = _split_course_names(row_values.get("course_name"))
+    if not course_names:
         raise ValueError("과정명이 비어 있습니다.")
 
     try:
@@ -147,7 +156,7 @@ def _row_to_fields(row_values: dict[str, Any]) -> dict[str, Any]:
             base_revenue,
             calculated_amount,
         )
-        fields: dict[str, Any] = {
+        base_fields: dict[str, Any] = {
             "invoice_deadline_date": invoice_deadline_date,
             "invoice_deadline_year": (
                 invoice_deadline_date.year if invoice_deadline_date else None
@@ -156,7 +165,6 @@ def _row_to_fields(row_values: dict[str, Any]) -> dict[str, Any]:
             "category": _parse_str(row_values.get("category")),
             "client_name": client_name,
             "business_detail": _parse_str(row_values.get("business_detail")),
-            "course_name": course_name,
             "base_revenue": base_revenue,
             "settlement_rate": settlement_rate,
             "settlement_rate_raw": settlement_rate_raw,
@@ -172,7 +180,8 @@ def _row_to_fields(row_values: dict[str, Any]) -> dict[str, Any]:
         }
     except (InvalidOperation, ValueError) as exc:
         raise ValueError(f"숫자 파싱 실패: {exc}") from exc
-    return fields
+
+    return [{**base_fields, "course_name": course_name} for course_name in course_names]
 
 
 def _excel_cell_value(value: Any) -> Any:
@@ -358,9 +367,9 @@ async def import_separate_settlements(
                 row_values[field] = row[idx]
 
         try:
-            fields = _row_to_fields(row_values)
-            to_insert.append(SeparateSettlement(**fields))
-            created += 1
+            for fields in _row_to_fields(row_values):
+                to_insert.append(SeparateSettlement(**fields))
+                created += 1
         except Exception as exc:
             failed += 1
             errors.append(

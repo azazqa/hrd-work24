@@ -69,7 +69,7 @@ def test_resolve_settlement_rate_none_when_base_zero():
 
 
 def test_row_to_fields_example():
-    fields = _row_to_fields(
+    rows = _row_to_fields(
         {
             "invoice_deadline_date": "2024-02-22",
             "sales_rep": "김승훈",
@@ -90,12 +90,39 @@ def test_row_to_fields_example():
             "invoice_issuer": "rmptax@thermp.co.kr",
         }
     )
+    assert len(rows) == 1
+    fields = rows[0]
     assert fields["invoice_deadline_date"].isoformat() == "2024-02-22"
     assert fields["invoice_deadline_year"] == 2024
     assert fields["settlement_rate"] == Decimal("0.25")
     assert fields["settlement_rate_raw"] == "25%"
     assert fields["deduction_amount"] is None
     assert fields["client_name"] == "(주)한국이러닝인재개발원"
+
+
+def test_split_course_names_by_newline():
+    from app.routes.separate_settlements import _split_course_names
+
+    assert _split_course_names("과정A\n과정B") == ["과정A", "과정B"]
+    assert _split_course_names("과정A\r\n과정B\r\n") == ["과정A", "과정B"]
+    assert _split_course_names("  과정A  \n\n  과정B  ") == ["과정A", "과정B"]
+    assert _split_course_names("") == []
+    assert _split_course_names(None) == []
+
+
+def test_row_to_fields_splits_multiline_course_name():
+    rows = _row_to_fields(
+        {
+            "client_name": "고객",
+            "course_name": "과정A\n과정B\r\n과정C",
+            "base_revenue": 10000000,
+            "settlement_rate": "25%",
+            "calculated_amount": 2500000,
+        }
+    )
+    assert [r["course_name"] for r in rows] == ["과정A", "과정B", "과정C"]
+    assert all(r["client_name"] == "고객" for r in rows)
+    assert all(r["settlement_rate"] == Decimal("0.25") for r in rows)
 
 
 @pytest.mark.asyncio
