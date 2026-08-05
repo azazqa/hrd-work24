@@ -3,9 +3,11 @@ from __future__ import annotations
 import io
 import logging
 import re
-from datetime import date, datetime, timezone
+from calendar import monthrange
+from collections import defaultdict
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
-from typing import Any, Literal
+from typing import Any, Collection, Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
@@ -37,6 +39,7 @@ from app.models import (
     OwnedSettlementCompareResultRow,
     SchedulerJob,
     SchedulerJobQueue,
+    SeparateSettlement,
     Settlement,
     SettlementConsolidated,
     User,
@@ -293,6 +296,143 @@ def _extract_range_start(text: str) -> str:
     if "~" in text:
         return text.split("~", maxsplit=1)[0]
     return text
+
+
+def _extract_range_end(text: str) -> str | None:
+    """전처리된 구간이면 종료일 텍스트 반환."""
+    for pattern in (_COMPACT_RANGE_RE, _HYPHEN_DATE_RANGE_RE):
+        m = pattern.match(text)
+        if m:
+            return m.group(2)
+
+    if "~" in text:
+        end = text.split("~", maxsplit=1)[1]
+        return end or None
+    return None
+
+
+def _add_months(value: date, months: int) -> date:
+    month_index = value.month - 1 + months
+    year = value.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(value.day, monthrange(year, month)[1])
+    return date(year, month, day)
+
+
+def _parse_contract_period_range(value: Any) -> tuple[date, date] | None:
+    """고정 계약기간 → [start, end] 폐구간. 실패 시 None."""
+    if value is None or value == "":
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    normalized = _preprocess_education_period(text)
+    start_text = _extract_range_start(normalized)
+    end_text = _extract_range_end(normalized)
+    if not end_text:
+        return None
+    start = _parse_single_date_text(start_text)
+    end = _parse_single_date_text(end_text)
+    if start is None or end is None:
+        return None
+    if end < start:
+        return None
+    return start, end
+
+
+def _parse_relative_contract_period(value: Any) -> Literal["1y", "6m"] | None:
+    """상대 계약기간 문구 → 1년/6개월."""
+    if value is None or value == "":
+        return None
+    compact = re.sub(r"\s+", "", str(value))
+    if not compact:
+        return None
+    if "6개월" in compact:
+        return "6m"
+    if "1년" in compact:
+        return "1y"
+    return None
+
+
+def _resolve_contract_window(
+    contract_period: Any, anchor: date | None
+) -> tuple[date, date] | None:
+    """별도 정산 contract_period → [start, end] (포함)."""
+    fixed = _parse_contract_period_range(contract_period)
+    if fixed is not None:
+        return fixed
+    relative = _parse_relative_contract_period(contract_period)
+    if relative is None or anchor is None:
+        return None
+    months = 6 if relative == "6m" else 12
+    end = _add_months(anchor, months) - timedelta(days=1)
+    return anchor, end
+
+
+async def _collect_separate_opening_ids(
+    session: AsyncSession, year: int
+) -> set[int]:
+    """별도 정산 계약기간에 포함되는 owned_course_openings.id 집합."""
+    owned_rows = (
+        await session.execute(
+            select(
+                OwnedCourseOpening.id,
+                OwnedCourseOpening.course_name,
+                OwnedCourseOpening.tra_start_date,
+                ClientNameMapping.client_name,
+            )
+            .join(
+                ClientNameMapping,
+                and_(
+                    ClientNameMapping.institution_name
+                    == func.trim(OwnedCourseOpening.institution_name),
+                    ClientNameMapping.is_delete == False,  # noqa: E712
+                ),
+            )
+            .where(
+                OwnedCourseOpening.is_delete == False,  # noqa: E712
+                OwnedCourseOpening.year == year,
+                OwnedCourseOpening.tra_start_date.is_not(None),
+            )
+        )
+    ).all()
+
+    groups: dict[tuple[str, str], list[tuple[int, date]]] = defaultdict(list)
+    for opening_id, course_name, tra_start, client_name in owned_rows:
+        client_key = _normalize_name_for_mapping(client_name)
+        course_key = _normalize_course_name_for_compare(course_name)
+        if not client_key or not course_key or tra_start is None:
+            continue
+        groups[(client_key, course_key)].append((int(opening_id), tra_start))
+
+    anchors: dict[tuple[str, str], date] = {
+        key: min(start for _, start in items) for key, items in groups.items()
+    }
+
+    separate_rows = (
+        await session.execute(
+            select(SeparateSettlement).where(
+                SeparateSettlement.is_delete == False  # noqa: E712
+            )
+        )
+    ).scalars().all()
+
+    separate_ids: set[int] = set()
+    for sep in separate_rows:
+        client_key = _normalize_name_for_mapping(sep.client_name)
+        course_key = _normalize_course_name_for_compare(sep.course_name)
+        key = (client_key, course_key)
+        items = groups.get(key)
+        if not items:
+            continue
+        window = _resolve_contract_window(sep.contract_period, anchors.get(key))
+        if window is None:
+            continue
+        start, end = window
+        for opening_id, tra_start in items:
+            if start <= tra_start <= end:
+                separate_ids.add(opening_id)
+    return separate_ids
 
 
 def _parse_single_date_text(text: str) -> date | None:
@@ -649,7 +789,7 @@ async def import_settlements(
     )
 
 
-CompareStatus = Literal["matched", "partial", "unsettled", "unmapped"]
+CompareStatus = Literal["matched", "partial", "unsettled", "unmapped", "separate"]
 
 
 class OwnedSettlementCompareItem(BaseModel):
@@ -669,6 +809,7 @@ class OwnedSettlementCompareResult(BaseModel):
     total: int
     matched: int
     partial: int = 0
+    separate: int = 0
     unsettled: int
     unmapped: int
     has_result: bool = False
@@ -785,8 +926,8 @@ def _sql_normalize_course_name(column):
     return func.regexp_replace(text, r"[^0-9A-Za-z가-힣]+", "", "g")
 
 
-def _compare_status_expr():
-    """보유과정 row → matched | partial | unsettled | unmapped SQL 식."""
+def _compare_status_expr(separate_ids: Collection[int] | None = None):
+    """보유과정 row → matched | partial | unsettled | unmapped | separate SQL 식."""
     owned_course_key = _sql_normalize_course_name(OwnedCourseOpening.course_name)
     settlement_key = and_(
         _sql_strip_all_whitespace(SettlementConsolidated.client_name)
@@ -808,8 +949,14 @@ def _compare_status_expr():
         (owned_man.op("~")(r"^[0-9]+$"), cast(owned_man, Integer)),
         else_=None,
     )
+    is_separate = (
+        OwnedCourseOpening.id.in_(list(separate_ids))
+        if separate_ids
+        else literal(False)
+    )
     return case(
         (ClientNameMapping.id.is_(None), literal("unmapped")),
+        (is_separate, literal("separate")),
         (
             or_(
                 OwnedCourseOpening.tra_start_date.is_(None),
@@ -831,8 +978,8 @@ def _compare_status_expr():
     )
 
 
-def _compare_base_stmt(year: int):
-    status_expr = _compare_status_expr()
+def _compare_base_stmt(year: int, separate_ids: Collection[int] | None = None):
+    status_expr = _compare_status_expr(separate_ids)
     inst_trim = func.trim(OwnedCourseOpening.institution_name)
     return (
         select(
@@ -1117,6 +1264,15 @@ async def _load_compare_summary(
                 func.coalesce(
                     func.sum(
                         case(
+                            (OwnedSettlementCompareResultRow.status == "separate", 1),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ).label("separate"),
+                func.coalesce(
+                    func.sum(
+                        case(
                             (OwnedSettlementCompareResultRow.status == "unsettled", 1),
                             else_=0,
                         )
@@ -1148,6 +1304,7 @@ async def _load_compare_summary(
         total=total,
         matched=int(counts.matched or 0),
         partial=int(counts.partial or 0),
+        separate=int(counts.separate or 0),
         unsettled=int(counts.unsettled or 0),
         unmapped=int(counts.unmapped or 0),
         has_result=has_result,
@@ -1175,9 +1332,11 @@ async def _persist_compare_results(
             detail="해당 연도 추출 캐시가 없습니다. 먼저 추출/갱신을 실행하세요.",
         )
 
+    separate_ids = await _collect_separate_opening_ids(session, year)
+
     classified = (
         await session.execute(
-            _compare_base_stmt(year).order_by(
+            _compare_base_stmt(year, separate_ids).order_by(
                 OwnedCourseOpening.institution_name.asc().nulls_last(),
                 OwnedCourseOpening.course_name.asc().nulls_last(),
                 OwnedCourseOpening.tra_start_date.asc().nulls_last(),
@@ -1305,8 +1464,9 @@ _COMPARE_EXPORT_HEADERS = [
 _COMPARE_STATUS_SHEETS: list[tuple[CompareStatus, str]] = [
     ("unsettled", "미정산"),
     ("partial", "일부정산"),
-    ("unmapped", "맵핑없음"),
+    ("separate", "별도정산"),
     ("matched", "정산됨"),
+    ("unmapped", "맵핑없음"),
 ]
 
 
@@ -1363,6 +1523,7 @@ async def export_owned_settlement_compare(
     by_status: dict[str, list[OwnedSettlementCompareResultRow]] = {
         "matched": [],
         "partial": [],
+        "separate": [],
         "unsettled": [],
         "unmapped": [],
     }
@@ -1377,6 +1538,7 @@ async def export_owned_settlement_compare(
     ws_summary.append(["전체", summary.total])
     ws_summary.append(["정산됨", summary.matched])
     ws_summary.append(["일부 정산", summary.partial])
+    ws_summary.append(["별도 정산", summary.separate])
     ws_summary.append(["미정산", summary.unsettled])
     ws_summary.append(["맵핑 없음", summary.unmapped])
     ws_summary.append(

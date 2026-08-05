@@ -150,6 +150,7 @@ export function CompareOwnedClient({
       { label: "전체", value: result.total },
       { label: "정산됨", value: result.matched },
       { label: "일부 정산", value: result.partial ?? 0 },
+      { label: "별도 정산", value: result.separate ?? 0 },
       { label: "미정산", value: result.unsettled },
       { label: "맵핑 없음", value: result.unmapped },
     ];
@@ -361,7 +362,7 @@ export function CompareOwnedClient({
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       {summary ? (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {summary.map((s) => (
             <div key={s.label} className="rounded-md border px-4 py-3 bg-muted/30">
               <div className="text-xs text-muted-foreground">{s.label}</div>
@@ -382,10 +383,13 @@ export function CompareOwnedClient({
             <TabsTrigger value="partial">
               일부 정산 ({result.partial ?? 0})
             </TabsTrigger>
+            <TabsTrigger value="separate">
+              별도 정산 ({result.separate ?? 0})
+            </TabsTrigger>
+            <TabsTrigger value="matched">정산됨 ({result.matched})</TabsTrigger>
             <TabsTrigger value="unmapped">
               맵핑 없음 ({result.unmapped})
             </TabsTrigger>
-            <TabsTrigger value="matched">정산됨 ({result.matched})</TabsTrigger>
           </TabsList>
           <TabsContent value={tab} className="mt-4 space-y-2">
             <CompareTable

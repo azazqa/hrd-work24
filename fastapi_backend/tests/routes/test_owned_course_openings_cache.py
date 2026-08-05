@@ -82,6 +82,7 @@ async def test_get_compare_reads_stored_results_only(
     assert body["has_result"] is True
     assert body["matched"] == 1
     assert body["partial"] == 0
+    assert body["separate"] == 0
     assert body["unsettled"] == 1
     assert body["unmapped"] == 0
     assert body["compared_at"]

@@ -11,8 +11,9 @@ import { CompareOwnedClient } from "./compare-client";
 const TABS: OwnedSettlementCompareStatus[] = [
   "unsettled",
   "partial",
-  "unmapped",
+  "separate",
   "matched",
+  "unmapped",
 ];
 
 interface PageProps {
