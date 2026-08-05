@@ -274,13 +274,26 @@ def test_normalize_course_name_for_compare():
             "[태그]간호사가꼭알아야할현장실무_24.06"
         )
     )
+    # 한글·영문·숫자 외 특수문자 제거
+    assert (
+        _normalize_course_name_for_compare("정보-보안 / 기본서! (카드)")
+        == "정보보안기본서"
+    )
+    assert (
+        _normalize_course_name_for_compare("AI·머신러닝·101")
+        == "AI머신러닝101"
+    )
+    assert (
+        _normalize_course_name_for_compare("실무&이론")
+        == _normalize_course_name_for_compare("실무 이론")
+    )
 
 
 @pytest.mark.asyncio
 async def test_compare_matches_normalized_course_name_tags(
     test_client, authenticated_user, db_session
 ):
-    """선행[]·후행()·_접미·공백 정규화 후 과정명이 같으면 매칭한다."""
+    """선행[]·후행()·_접미·특수문자 정규화 후 과정명이 같으면 매칭한다."""
     headers = authenticated_user["headers"]
     extracted_at = datetime.now(timezone.utc)
     db_session.add(
@@ -302,7 +315,7 @@ async def test_compare_matches_normalized_course_name_tags(
                 purchase_ym="202406",
                 purchase_year=2024,
                 client_name="정규화고객",
-                course_name="[태그]간호사가꼭알아야할현장실무_24.06",
+                course_name="[태그]간호사·가 꼭 알아야 할 현장-실무!_24.06",
                 education_period="2024.06.30",
                 education_period_date=date(2024, 6, 30),
                 headcount=161,

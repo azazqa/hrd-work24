@@ -755,10 +755,12 @@ def _sql_strip_all_whitespace(column):
 _LEADING_BRACKET_TAGS_RE = re.compile(r"^(?:\[[^\]]*\])+")
 _TRAILING_PAREN_TAGS_RE = re.compile(r"(?:\s*\([^)]*\))+$")
 _LAST_UNDERSCORE_SUFFIX_RE = re.compile(r"_[^_]*$")
+# 한글 완성형·영문·숫자만 유지 (공백·특수문자 제거)
+_COURSE_NAME_KEEP_RE = re.compile(r"[^0-9A-Za-z가-힣]+")
 
 
 def _normalize_course_name_for_compare(value: str | None) -> str:
-    """과정명 비교 정규화: 선행[]·후행()·마지막_접미 제거 후 공백 제거."""
+    """과정명 비교 정규화: 선행[]·후행()·마지막_접미 제거 후 한글·영문·숫자만 유지."""
     if value is None:
         return ""
     text = str(value).strip()
@@ -767,7 +769,7 @@ def _normalize_course_name_for_compare(value: str | None) -> str:
     text = _LEADING_BRACKET_TAGS_RE.sub("", text)
     text = _TRAILING_PAREN_TAGS_RE.sub("", text)
     text = _LAST_UNDERSCORE_SUFFIX_RE.sub("", text)
-    return re.sub(r"\s+", "", text)
+    return _COURSE_NAME_KEEP_RE.sub("", text)
 
 
 def _sql_normalize_course_name(column):
@@ -779,8 +781,8 @@ def _sql_normalize_course_name(column):
     text = func.regexp_replace(text, r"(?:\s*\([^)]*\))+$", "", "g")
     # 마지막 _접미
     text = func.regexp_replace(text, r"_[^_]*$", "", "g")
-    # 모든 공백 제거
-    return func.regexp_replace(text, r"\s+", "", "g")
+    # 한글·영문·숫자만 유지 (공백·특수문자 제거)
+    return func.regexp_replace(text, r"[^0-9A-Za-z가-힣]+", "", "g")
 
 
 def _compare_status_expr():
