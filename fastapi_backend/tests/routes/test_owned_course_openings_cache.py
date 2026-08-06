@@ -465,7 +465,7 @@ async def test_extract_replaces_year_cache(db_session):
         patch(
             "scheduler.jobs.owned_course_opening_extract._load_active_owned_names",
             new=AsyncMock(return_value=["신과정"]),
-        ),
+        ) as load_names,
         patch(
             "scheduler.jobs.owned_course_opening_extract._build_owned_scroll_body",
             return_value={"query": {"match_all": {}}},
@@ -483,6 +483,8 @@ async def test_extract_replaces_year_cache(db_session):
             {"year": 2024, "min_score": 0, "queue_id": q.id}
         )
 
+    load_names.assert_awaited_once()
+    assert load_names.await_args.kwargs.get("usable_in_year") == 2024
     build_body.assert_called_once_with(
         ["신과정"], 2024, 0.0, has_reg_course_man=True
     )

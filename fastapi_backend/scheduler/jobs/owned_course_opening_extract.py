@@ -116,7 +116,7 @@ async def _run_extract(payload: dict[str, Any]) -> dict[str, Any]:
     queue_id = payload.get("queue_id")
 
     async with async_session_maker() as session:
-        names = await _load_active_owned_names(session)
+        names = await _load_active_owned_names(session, usable_in_year=year)
 
     owned_rows: list[dict[str, Any]] = []
     if names:
