@@ -10,9 +10,29 @@ from app.routes.courses import (
     _assert_export_within_limit,
     _course_item_to_row,
     _extract_total_count,
+    _parse_course_from_es,
     _write_courses_xlsx,
 )
 from app.routes.courses import CourseListItem
+
+
+def test_parse_course_from_es_list_course_name():
+    """ES 다중값 필드가 list로 와도 CourseListItem 문자열로 정규화한다."""
+    item = _parse_course_from_es(
+        {
+            "trngCrseNm": ["2024기업직업훈련카드"],
+            "instNm": ["기관A"],
+            "traStartDate": "2024-01-01",
+        }
+    )
+    assert item.course_name == "2024기업직업훈련카드"
+    assert item.inst_name == "기관A"
+    assert item.tra_start_date == "2024-01-01"
+
+
+def test_parse_course_from_es_falls_back_title_when_list_empty():
+    item = _parse_course_from_es({"trngCrseNm": [], "title": "대체과정명"})
+    assert item.course_name == "대체과정명"
 
 
 def test_course_item_to_row_order_and_values():

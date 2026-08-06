@@ -163,21 +163,35 @@ def _normalize_work24_date(value: str, field_name: str) -> str:
     return normalized
 
 
+def _es_str(value) -> str | None:
+    """ES 소스 값을 문자열로 정규화. 리스트/튜플이면 첫 non-empty 항목 사용."""
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            text = _es_str(item)
+            if text:
+                return text
+        return None
+    text = str(value).strip()
+    return text or None
+
+
 def _parse_course_from_es(source: dict) -> CourseListItem:
     return CourseListItem(
-        trainst_cst_id=source.get("trainstCstId"),
-        trpr_id=source.get("trprId"),
-        trpr_degr=source.get("trprDegr"),
-        course_name=source.get("trngCrseNm") or source.get("title"),
-        inst_name=source.get("instNm") or source.get("subTitle"),
-        tra_start_date=source.get("traStartDate"),
-        tra_end_date=source.get("traEndDate"),
-        address=source.get("address"),
-        tel_no=source.get("telNo"),
-        title_link=source.get("titleLink"),
-        reg_course_man=source.get("regCourseMan"),
-        yard_man=source.get("yardMan"),
-        real_man=source.get("realMan"),
+        trainst_cst_id=_es_str(source.get("trainstCstId")),
+        trpr_id=_es_str(source.get("trprId")),
+        trpr_degr=_es_str(source.get("trprDegr")),
+        course_name=_es_str(source.get("trngCrseNm")) or _es_str(source.get("title")),
+        inst_name=_es_str(source.get("instNm")) or _es_str(source.get("subTitle")),
+        tra_start_date=_es_str(source.get("traStartDate")),
+        tra_end_date=_es_str(source.get("traEndDate")),
+        address=_es_str(source.get("address")),
+        tel_no=_es_str(source.get("telNo")),
+        title_link=_es_str(source.get("titleLink")),
+        reg_course_man=_es_str(source.get("regCourseMan")),
+        yard_man=_es_str(source.get("yardMan")),
+        real_man=_es_str(source.get("realMan")),
     )
 
 
