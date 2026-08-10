@@ -28,6 +28,7 @@ export type SettlementListPage = {
 
 export type SettlementListSearch = {
   year?: number;
+  company_id?: number;
   client_name?: string;
   course_name?: string;
 };
@@ -78,6 +79,7 @@ export type OwnedSettlementCompareStatus =
 
 export type OwnedSettlementCompareResult = {
   year: number;
+  company_id: number;
   total: number;
   matched: number;
   partial: number;
@@ -101,6 +103,7 @@ export type OwnedSettlementCompareItemsPage = {
 export type OwnedOpeningExtractQueue = {
   id: number;
   year: number;
+  company_id: number | null;
   status: string;
   row_count: number | null;
   extracted_at: string | null;
@@ -135,6 +138,7 @@ export async function fetchSettlements(
   q.set("page", String(page));
   q.set("size", String(size));
   if (search.year != null) q.set("year", String(search.year));
+  if (search.company_id != null) q.set("company_id", String(search.company_id));
   if (search.client_name?.trim()) q.set("client_name", search.client_name.trim());
   if (search.course_name?.trim()) q.set("course_name", search.course_name.trim());
 
@@ -172,6 +176,7 @@ export async function fetchSeparateSettlements(
   q.set("page", String(page));
   q.set("size", String(size));
   if (search.year != null) q.set("year", String(search.year));
+  if (search.company_id != null) q.set("company_id", String(search.company_id));
   if (search.client_name?.trim()) q.set("client_name", search.client_name.trim());
   if (search.course_name?.trim()) q.set("course_name", search.course_name.trim());
 
@@ -196,6 +201,7 @@ export async function fetchSeparateSettlements(
 
 export async function compareOwnedSettlements(
   year: number,
+  companyId: number,
 ): Promise<OwnedSettlementCompareResult | { message: string }> {
   const baseURL = process.env.API_BASE_URL;
   if (!baseURL) {
@@ -205,6 +211,7 @@ export async function compareOwnedSettlements(
   const token = await requireAccessToken();
   const q = new URLSearchParams();
   q.set("year", String(year));
+  q.set("company_id", String(companyId));
 
   const res = await fetch(
     `${baseURL}/settlements/compare-owned?${q.toString()}`,
@@ -230,6 +237,7 @@ export async function compareOwnedSettlements(
 
 export async function runOwnedSettlementCompare(
   year: number,
+  companyId: number,
 ): Promise<OwnedSettlementCompareResult | { message: string }> {
   const baseURL = process.env.API_BASE_URL;
   if (!baseURL) {
@@ -239,6 +247,7 @@ export async function runOwnedSettlementCompare(
   const token = await requireAccessToken();
   const q = new URLSearchParams();
   q.set("year", String(year));
+  q.set("company_id", String(companyId));
 
   const res = await fetch(
     `${baseURL}/settlements/compare-owned?${q.toString()}`,
@@ -265,6 +274,7 @@ export async function runOwnedSettlementCompare(
 
 export async function fetchCompareOwnedItems(
   year: number,
+  companyId: number,
   status: OwnedSettlementCompareStatus,
   page: number,
   size: number,
@@ -277,6 +287,7 @@ export async function fetchCompareOwnedItems(
   const token = await requireAccessToken();
   const q = new URLSearchParams();
   q.set("year", String(year));
+  q.set("company_id", String(companyId));
   q.set("status", status);
   q.set("page", String(page));
   q.set("size", String(size));
@@ -305,6 +316,7 @@ export async function fetchCompareOwnedItems(
 
 export async function refreshOwnedCourseOpenings(
   year: number,
+  companyId: number,
 ): Promise<OwnedOpeningExtractQueue | { message: string }> {
   const baseURL = process.env.API_BASE_URL;
   if (!baseURL) {
@@ -314,6 +326,7 @@ export async function refreshOwnedCourseOpenings(
   const token = await requireAccessToken();
   const q = new URLSearchParams();
   q.set("year", String(year));
+  q.set("company_id", String(companyId));
 
   const res = await fetch(
     `${baseURL}/settlements/compare-owned/refresh?${q.toString()}`,

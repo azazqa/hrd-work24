@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { CompanySelect } from "@/components/company-select";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,6 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Field, FieldLabel } from "@/components/ui/field";
 
 type SeparateSettlementImportResult = {
   deleted: number;
@@ -41,6 +43,7 @@ export function SeparateExcelImportDialog() {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
+  const [companyId, setCompanyId] = useState("");
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<SeparateSettlementImportResult | null>(
     null,
@@ -52,10 +55,15 @@ export function SeparateExcelImportDialog() {
       toast.error("엑셀 파일을 선택하세요.");
       return;
     }
+    if (!companyId) {
+      toast.error("업체를 선택하세요.");
+      return;
+    }
     setPending(true);
     setResult(null);
     try {
       const formData = new FormData();
+      formData.append("company_id", companyId);
       formData.append("file", file);
       const res = await fetch("/api/settlements/separate/import", {
         method: "POST",
@@ -82,6 +90,7 @@ export function SeparateExcelImportDialog() {
     setOpen(next);
     if (!next) {
       setResult(null);
+      setCompanyId("");
       if (fileRef.current) fileRef.current.value = "";
     }
   };
@@ -97,9 +106,13 @@ export function SeparateExcelImportDialog() {
         </DialogHeader>
         <div className="space-y-4 text-sm">
           <p className="text-muted-foreground">
-            엑셀을 업로드하면 기존 별도 정산 데이터가{" "}
-            <strong>전부 삭제된 뒤</strong> 엑셀 내용으로 교체됩니다.
+            업체를 선택한 뒤 엑셀을 업로드하면 해당 업체의 기존 별도 정산 데이터가{" "}
+            <strong>삭제된 뒤</strong> 엑셀 내용으로 교체됩니다.
           </p>
+          <Field>
+            <FieldLabel>업체</FieldLabel>
+            <CompanySelect value={companyId} onValueChange={setCompanyId} />
+          </Field>
           <Button variant="secondary" asChild>
             <a href="/api/settlements/separate/import/template" download>
               양식 다운로드

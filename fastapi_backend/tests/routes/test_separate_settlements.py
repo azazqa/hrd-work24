@@ -12,6 +12,7 @@ from app.routes.separate_settlements import (
     _resolve_settlement_rate,
     _row_to_fields,
 )
+from tests.conftest import create_company
 
 
 def _xlsx_bytes(headers: list[str], rows: list[list]) -> bytes:
@@ -130,11 +131,14 @@ async def test_import_example_and_full_replace(
     test_client, authenticated_user, db_session
 ):
     headers = authenticated_user["headers"]
+    company = await create_company(db_session)
+    cid = company.id
 
     first = _xlsx_bytes(HEADERS, [EXAMPLE_ROW])
     res1 = await test_client.post(
         "/settlements/separate/import",
         headers=headers,
+        data={"company_id": str(cid)},
         files={
             "file": (
                 "separate.xlsx",
@@ -169,6 +173,7 @@ async def test_import_example_and_full_replace(
     res2 = await test_client.post(
         "/settlements/separate/import",
         headers=headers,
+        data={"company_id": str(cid)},
         files={
             "file": (
                 "separate.xlsx",
@@ -182,10 +187,16 @@ async def test_import_example_and_full_replace(
     assert body2["deleted"] == 1
     assert body2["created"] == 1
 
-    count = await db_session.scalar(select(func.count()).select_from(SeparateSettlement))
+    count = await db_session.scalar(
+        select(func.count())
+        .select_from(SeparateSettlement)
+        .where(SeparateSettlement.company_id == cid)
+    )
     assert count == 1
     row = (
-        await db_session.execute(select(SeparateSettlement))
+        await db_session.execute(
+            select(SeparateSettlement).where(SeparateSettlement.company_id == cid)
+        )
     ).scalars().one()
     assert row.client_name == "교체고객"
     assert row.course_name == "교체과정"
@@ -198,21 +209,26 @@ async def test_list_separate_settlements_filters(
     test_client, authenticated_user, db_session
 ):
     headers = authenticated_user["headers"]
+    company = await create_company(db_session)
+    cid = company.id
     db_session.add_all(
         [
             SeparateSettlement(
+                company_id=cid,
                 invoice_deadline_date=date(2024, 2, 22),
                 invoice_deadline_year=2024,
                 client_name="한국이러닝",
                 course_name="과정A",
             ),
             SeparateSettlement(
+                company_id=cid,
                 invoice_deadline_date=date(2024, 5, 1),
                 invoice_deadline_year=2024,
                 client_name="다른고객",
                 course_name="과정B",
             ),
             SeparateSettlement(
+                company_id=cid,
                 invoice_deadline_date=date(2025, 1, 1),
                 invoice_deadline_year=2025,
                 client_name="한국이러닝",
@@ -225,7 +241,7 @@ async def test_list_separate_settlements_filters(
     res = await test_client.get(
         "/settlements/separate",
         headers=headers,
-        params={"year": 2024, "client_name": "한국", "page": 1, "size": 20},
+        params={"company_id": cid, "year": 2024, "client_name": "한국", "page": 1, "size": 20},
     )
     assert res.status_code == 200
     data = res.json()
@@ -235,7 +251,7 @@ async def test_list_separate_settlements_filters(
     res2 = await test_client.get(
         "/settlements/separate",
         headers=headers,
-        params={"course_name": "과정B", "page": 1, "size": 20},
+        params={"company_id": cid, "course_name": "과정B", "page": 1, "size": 20},
     )
     assert res2.status_code == 200
     assert res2.json()["total"] == 1
@@ -245,10 +261,13 @@ async def test_list_separate_settlements_filters(
 @pytest.mark.asyncio
 async def test_export_and_template(test_client, authenticated_user, db_session):
     headers = authenticated_user["headers"]
+    company = await create_company(db_session)
+    cid = company.id
     content = _xlsx_bytes(HEADERS, [EXAMPLE_ROW])
     await test_client.post(
         "/settlements/separate/import",
         headers=headers,
+        data={"company_id": str(cid)},
         files={
             "file": (
                 "separate.xlsx",
@@ -266,7 +285,7 @@ async def test_export_and_template(test_client, authenticated_user, db_session):
     assert "spreadsheetml" in (template.headers.get("content-type") or "")
 
     export = await test_client.get(
-        "/settlements/separate/export",
+        f"/settlements/separate/export?company_id={cid}",
         headers=headers,
     )
     assert export.status_code == 200, export.text

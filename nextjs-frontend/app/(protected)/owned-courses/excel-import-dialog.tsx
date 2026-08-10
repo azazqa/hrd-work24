@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import type { OwnedCourseImportResult } from "@/app/openapi-client";
+import { CompanySelect } from "@/components/company-select";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,6 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Field, FieldLabel } from "@/components/ui/field";
 
 async function readApiError(res: Response): Promise<string> {
   const text = await res.text().catch(() => "");
@@ -35,6 +37,7 @@ export function ExcelImportDialog() {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
+  const [companyId, setCompanyId] = useState("");
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<OwnedCourseImportResult | null>(null);
 
@@ -44,10 +47,15 @@ export function ExcelImportDialog() {
       toast.error("엑셀 파일을 선택하세요.");
       return;
     }
+    if (!companyId) {
+      toast.error("업체를 선택하세요.");
+      return;
+    }
     setPending(true);
     setResult(null);
     try {
       const formData = new FormData();
+      formData.append("company_id", companyId);
       formData.append("file", file);
       const res = await fetch("/api/owned-courses/import", {
         method: "POST",
@@ -74,6 +82,7 @@ export function ExcelImportDialog() {
     setOpen(next);
     if (!next) {
       setResult(null);
+      setCompanyId("");
       if (fileRef.current) fileRef.current.value = "";
     }
   };
@@ -89,9 +98,13 @@ export function ExcelImportDialog() {
         </DialogHeader>
         <div className="space-y-4 text-sm">
           <p className="text-muted-foreground">
-            양식을 다운로드한 뒤 데이터를 입력하고 업로드하세요. 과정명·개발년도가
-            같으면 기존 데이터를 수정하고, 없으면 새로 등록합니다.
+            업체를 선택한 뒤 양식 데이터를 업로드하세요. 동일 업체·과정명·개발년도면
+            수정하고, 없으면 새로 등록합니다.
           </p>
+          <Field>
+            <FieldLabel>업체</FieldLabel>
+            <CompanySelect value={companyId} onValueChange={setCompanyId} />
+          </Field>
           <Button variant="secondary" asChild>
             <a href="/api/owned-courses/import/template" download>
               양식 다운로드

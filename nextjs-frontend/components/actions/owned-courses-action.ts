@@ -16,6 +16,7 @@ import { requireAccessToken } from "@/components/actions/auth-token";
 
 export type OwnedCourseListSearch = {
   q?: string;
+  company_id?: number;
   is_active?: boolean;
   dev_year?: number;
   division?: string;
@@ -44,6 +45,7 @@ export async function fetchOwnedCourses(
       page,
       size,
       q: search.q?.trim() || undefined,
+      company_id: search.company_id,
       is_active: search.is_active,
       dev_year: search.dev_year,
       division: search.division?.trim() || undefined,

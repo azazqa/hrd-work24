@@ -2,6 +2,7 @@
 
 import { buildSearchQuery, useSearchFormSync } from "@/lib/use-search-form-sync";
 import { getTraYearOptions } from "@/lib/date-utils";
+import { CompanySelect } from "@/components/company-select";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ import {
 } from "@/components/ui/select";
 
 type FormState = {
+  company_id: string;
   year: string;
   client_name: string;
   course_name: string;
@@ -23,6 +25,7 @@ export type SettlementsSearchInitial = Partial<FormState>;
 
 function fromInitial(initial: SettlementsSearchInitial): FormState {
   return {
+    company_id: initial.company_id ?? "",
     year: initial.year ?? "",
     client_name: initial.client_name ?? "",
     course_name: initial.course_name ?? "",
@@ -31,6 +34,7 @@ function fromInitial(initial: SettlementsSearchInitial): FormState {
 
 function buildSearchQueryString(form: FormState, size: number): string {
   return buildSearchQuery(size, {
+    company_id: form.company_id,
     year: form.year,
     client_name: form.client_name,
     course_name: form.course_name,
@@ -62,7 +66,17 @@ export function SettlementsSearchForm({
   return (
     <form onSubmit={handleSubmit}>
       <FieldSet>
-        <FieldGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <FieldGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Field>
+            <FieldLabel htmlFor="company_id">업체</FieldLabel>
+            <CompanySelect
+              id="company_id"
+              value={form.company_id}
+              onValueChange={(v) => setForm({ ...form, company_id: v })}
+              allowEmpty
+              emptyLabel="전체"
+            />
+          </Field>
           <Field>
             <FieldLabel htmlFor="year">매입년도</FieldLabel>
             <Select

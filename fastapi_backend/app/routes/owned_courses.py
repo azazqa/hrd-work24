@@ -4,7 +4,7 @@ import io
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from fastapi_pagination.ext.sqlalchemy import apaginate
 from openpyxl import Workbook, load_workbook
@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_async_session
 from app.models import OwnedCourse, User
 from app.pagination import MAX_PAGE_SIZE, Page, Params
+from app.routes.companies import require_active_company
 from app.users import current_active_user
 
 router = APIRouter()
@@ -41,6 +42,7 @@ FIELD_TO_HEADER = {field: label for label, field in EXCEL_HEADERS}
 
 class OwnedCourseListItem(BaseModel):
     id: int
+    company_id: int | None
     dev_year: int | None
     division: str | None
     course_name: str
@@ -51,6 +53,7 @@ class OwnedCourseRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    company_id: int | None
     dev_year: int | None
     dev_round: str | None
     review_round: str | None
@@ -70,6 +73,7 @@ class OwnedCourseRead(BaseModel):
 
 
 class OwnedCourseCreate(BaseModel):
+    company_id: int
     dev_year: int | None = None
     dev_round: str | None = Field(default=None, max_length=50)
     review_round: str | None = Field(default=None, max_length=50)
@@ -87,6 +91,7 @@ class OwnedCourseCreate(BaseModel):
 
 
 class OwnedCourseUpdate(BaseModel):
+    company_id: int
     dev_year: int | None = None
     dev_round: str | None = Field(default=None, max_length=50)
     review_round: str | None = Field(default=None, max_length=50)
@@ -118,6 +123,7 @@ class OwnedCourseImportResult(BaseModel):
 def _to_list_item(row: OwnedCourse) -> OwnedCourseListItem:
     return OwnedCourseListItem(
         id=row.id,
+        company_id=row.company_id,
         dev_year=row.dev_year,
         division=row.division,
         course_name=row.course_name,
@@ -169,16 +175,20 @@ def _row_to_fields(row_values: dict[str, Any]) -> dict[str, Any]:
 async def _find_existing_for_import(
     session: AsyncSession,
     *,
+    company_id: int,
     course_name: str,
     dev_year: int | None,
 ) -> OwnedCourse | str:
-    """과정명(+개발년도)으로 기존 행을 찾는다. 'ambiguous'면 동명이 2건 이상."""
+    """업체+과정명(+개발년도)으로 기존 행을 찾는다. 'ambiguous'면 동명이 2건 이상."""
     stmt = select(OwnedCourse).where(
         OwnedCourse.is_delete == False,  # noqa: E712
+        OwnedCourse.company_id == company_id,
         OwnedCourse.course_name == course_name,
     )
     if dev_year is not None:
         stmt = stmt.where(OwnedCourse.dev_year == dev_year)
+    else:
+        stmt = stmt.where(OwnedCourse.dev_year.is_(None))
     rows = list((await session.scalars(stmt)).all())
     if len(rows) > 1:
         return "ambiguous"
@@ -190,6 +200,7 @@ async def list_owned_courses(
     page: int = 1,
     size: int = 20,
     q: str | None = Query(default=None, description="과정명 검색"),
+    company_id: int | None = Query(default=None, description="업체 ID"),
     is_active: bool | None = Query(default=None),
     dev_year: int | None = Query(default=None),
     division: str | None = Query(default=None),
@@ -203,6 +214,8 @@ async def list_owned_courses(
 
     params = Params(page=page, size=size)
     stmt = select(OwnedCourse).where(OwnedCourse.is_delete == False)  # noqa: E712
+    if company_id is not None:
+        stmt = stmt.where(OwnedCourse.company_id == company_id)
     if q and q.strip():
         stmt = stmt.where(OwnedCourse.course_name.ilike(f"%{q.strip()}%"))
     if is_active is not None:
@@ -237,10 +250,13 @@ async def download_import_template(
 
 @router.post("/import", response_model=OwnedCourseImportResult)
 async def import_owned_courses(
+    company_id: int = Form(..., description="업체 ID"),
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_async_session),
     _: User = Depends(current_active_user),
 ):
+    await require_active_company(session, company_id)
+
     if not file.filename or not file.filename.lower().endswith((".xlsx", ".xlsm")):
         raise HTTPException(status_code=400, detail="xlsx 파일만 업로드할 수 있습니다.")
 
@@ -291,11 +307,15 @@ async def import_owned_courses(
         try:
             fields = _row_to_fields(row_values)
             fields["course_name"] = course_name
+            fields["company_id"] = company_id
             fields["is_active"] = True
 
             dev_year = fields.get("dev_year")
             existing = await _find_existing_for_import(
-                session, course_name=course_name, dev_year=dev_year
+                session,
+                company_id=company_id,
+                course_name=course_name,
+                dev_year=dev_year,
             )
             if existing == "ambiguous":
                 failed += 1
@@ -344,6 +364,7 @@ async def create_owned_course(
     session: AsyncSession = Depends(get_async_session),
     _: User = Depends(current_active_user),
 ):
+    await require_active_company(session, body.company_id)
     row = OwnedCourse(**body.model_dump())
     session.add(row)
     await session.commit()
@@ -365,6 +386,9 @@ async def update_owned_course(
     data = body.model_dump(exclude_unset=True)
     if not data:
         raise HTTPException(status_code=400, detail="수정할 필드가 없습니다.")
+
+    if "company_id" in data:
+        await require_active_company(session, data["company_id"])
 
     for k, v in data.items():
         setattr(row, k, v)

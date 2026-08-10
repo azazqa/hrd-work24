@@ -8,13 +8,18 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const year = searchParams.get("year");
+  const companyId = searchParams.get("company_id");
   if (!year) {
     return new Response("year is required", { status: 400 });
+  }
+  if (!companyId) {
+    return new Response("company_id is required", { status: 400 });
   }
 
   const token = await requireAccessToken();
   const q = new URLSearchParams();
   q.set("year", year);
+  q.set("company_id", companyId);
 
   const res = await fetch(
     `${baseURL}/settlements/compare-owned/export?${q.toString()}`,

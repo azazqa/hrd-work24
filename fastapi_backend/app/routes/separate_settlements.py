@@ -6,7 +6,7 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from fastapi_pagination.ext.sqlalchemy import apaginate
 from openpyxl import Workbook, load_workbook
@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_async_session
 from app.models import SeparateSettlement, User
 from app.pagination import MAX_PAGE_SIZE, Page, Params
+from app.routes.companies import require_active_company
 from app.routes.courses import MAX_EXPORT_ROWS
 from app.routes.settlements import (
     _normalize_compare_date,
@@ -199,6 +200,7 @@ async def list_separate_settlements(
     page: int = 1,
     size: int = 20,
     year: int | None = Query(default=None, description="계산서(수취)마감일 연도"),
+    company_id: int | None = Query(default=None, description="업체 ID"),
     client_name: str | None = Query(default=None, description="고객사 검색"),
     course_name: str | None = Query(default=None, description="과정명 검색"),
     session: AsyncSession = Depends(get_async_session),
@@ -215,6 +217,8 @@ async def list_separate_settlements(
     )
     if year is not None:
         stmt = stmt.where(SeparateSettlement.invoice_deadline_year == year)
+    if company_id is not None:
+        stmt = stmt.where(SeparateSettlement.company_id == company_id)
     if client_name and client_name.strip():
         stmt = stmt.where(
             SeparateSettlement.client_name.ilike(f"%{client_name.strip()}%")
@@ -254,13 +258,19 @@ async def download_import_template(
 
 @router.get("/export")
 async def export_separate_settlements(
+    company_id: int = Query(..., description="업체 ID"),
     session: AsyncSession = Depends(get_async_session),
     _: User = Depends(current_active_user),
 ):
+    await require_active_company(session, company_id)
+
     total = await session.scalar(
         select(func.count())
         .select_from(SeparateSettlement)
-        .where(SeparateSettlement.is_delete == False)  # noqa: E712
+        .where(
+            SeparateSettlement.is_delete == False,  # noqa: E712
+            SeparateSettlement.company_id == company_id,
+        )
     )
     total = int(total or 0)
     if total > MAX_EXPORT_ROWS:
@@ -272,7 +282,10 @@ async def export_separate_settlements(
     rows = (
         await session.execute(
             select(SeparateSettlement)
-            .where(SeparateSettlement.is_delete == False)  # noqa: E712
+            .where(
+                SeparateSettlement.is_delete == False,  # noqa: E712
+                SeparateSettlement.company_id == company_id,
+            )
             .order_by(
                 SeparateSettlement.invoice_deadline_date.desc().nulls_last(),
                 SeparateSettlement.id.desc(),
@@ -309,10 +322,13 @@ async def export_separate_settlements(
 
 @router.post("/import", response_model=SeparateSettlementImportResult)
 async def import_separate_settlements(
+    company_id: int = Form(..., description="업체 ID"),
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_async_session),
     _: User = Depends(current_active_user),
 ):
+    await require_active_company(session, company_id)
+
     if not file.filename or not file.filename.lower().endswith((".xlsx", ".xlsm")):
         raise HTTPException(status_code=400, detail="xlsx 파일만 업로드할 수 있습니다.")
 
@@ -349,7 +365,9 @@ async def import_separate_settlements(
             status_code=400, detail="고객사, 과정명 열이 필요합니다."
         )
 
-    delete_result = await session.execute(delete(SeparateSettlement))
+    delete_result = await session.execute(
+        delete(SeparateSettlement).where(SeparateSettlement.company_id == company_id)
+    )
     deleted = delete_result.rowcount or 0
 
     created = 0
@@ -368,6 +386,7 @@ async def import_separate_settlements(
 
         try:
             for fields in _row_to_fields(row_values):
+                fields["company_id"] = company_id
                 to_insert.append(SeparateSettlement(**fields))
                 created += 1
         except Exception as exc:

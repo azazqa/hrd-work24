@@ -1,7 +1,6 @@
 "use client";
 
 import { buildSearchQuery, useSearchFormSync } from "@/lib/use-search-form-sync";
-import { CompanySelect } from "@/components/company-select";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -14,31 +13,22 @@ import {
 } from "@/components/ui/select";
 
 type FormState = {
-  company_id: string;
   q: string;
-  dev_year: string;
-  division: string;
   is_active: string;
 };
 
-export type OwnedCoursesSearchInitial = Partial<FormState>;
+export type CompaniesSearchInitial = Partial<FormState>;
 
-function fromInitial(initial: OwnedCoursesSearchInitial): FormState {
+function fromInitial(initial: CompaniesSearchInitial): FormState {
   return {
-    company_id: initial.company_id ?? "",
     q: initial.q ?? "",
-    dev_year: initial.dev_year ?? "",
-    division: initial.division ?? "",
     is_active: initial.is_active ?? "",
   };
 }
 
 function buildSearchQueryString(form: FormState, size: number): string {
   return buildSearchQuery(size, {
-    company_id: form.company_id,
     q: form.q,
-    dev_year: form.dev_year,
-    division: form.division,
     is_active: form.is_active || undefined,
   });
 }
@@ -47,15 +37,15 @@ function buildDefaultResetQuery(size: number): string {
   return `page=1&size=${size}`;
 }
 
-export function OwnedCoursesSearchForm({
+export function CompaniesSearchForm({
   initial,
   size,
 }: {
-  initial: OwnedCoursesSearchInitial;
+  initial: CompaniesSearchInitial;
   size: number;
 }) {
   const { form, setForm, handleSubmit, handleReset } = useSearchFormSync({
-    basePath: "/owned-courses",
+    basePath: "/companies",
     size,
     initial,
     fromInitial,
@@ -67,43 +57,14 @@ export function OwnedCoursesSearchForm({
   return (
     <form onSubmit={handleSubmit}>
       <FieldSet>
-        <FieldGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <FieldGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Field>
-            <FieldLabel htmlFor="company_id">업체</FieldLabel>
-            <CompanySelect
-              id="company_id"
-              value={form.company_id}
-              onValueChange={(v) => setForm({ ...form, company_id: v })}
-              allowEmpty
-              emptyLabel="전체"
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="q">과정명</FieldLabel>
+            <FieldLabel htmlFor="q">업체명</FieldLabel>
             <Input
               id="q"
               value={form.q}
               onChange={(e) => setForm({ ...form, q: e.target.value })}
-              placeholder="과정명 검색"
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="dev_year">개발년도</FieldLabel>
-            <Input
-              id="dev_year"
-              type="number"
-              value={form.dev_year}
-              onChange={(e) => setForm({ ...form, dev_year: e.target.value })}
-              placeholder="예: 2024"
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="division">구분</FieldLabel>
-            <Input
-              id="division"
-              value={form.division}
-              onChange={(e) => setForm({ ...form, division: e.target.value })}
-              placeholder="구분"
+              placeholder="업체명 검색"
             />
           </Field>
           <Field>

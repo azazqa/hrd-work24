@@ -1,13 +1,22 @@
 import { requireAccessToken } from "@/components/actions/auth-token";
 
-export async function GET() {
+export async function GET(request: Request) {
   const baseURL = process.env.API_BASE_URL;
   if (!baseURL) {
     return new Response("API_BASE_URL is not configured", { status: 500 });
   }
 
+  const { searchParams } = new URL(request.url);
+  const companyId = searchParams.get("company_id");
+  if (!companyId) {
+    return new Response("company_id is required", { status: 400 });
+  }
+
   const token = await requireAccessToken();
-  const res = await fetch(`${baseURL}/settlements/export`, {
+  const q = new URLSearchParams();
+  q.set("company_id", companyId);
+
+  const res = await fetch(`${baseURL}/settlements/export?${q.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   });

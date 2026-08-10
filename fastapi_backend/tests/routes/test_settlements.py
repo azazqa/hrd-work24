@@ -15,6 +15,7 @@ from app.routes.settlements import (
     _row_to_fields,
     _year_from_ym,
 )
+from tests.conftest import create_company
 
 
 def test_normalize_ym_from_string_and_number():
@@ -150,8 +151,11 @@ HEADERS = [
 async def test_import_replaces_year_and_rejects_other_year(
     test_client, authenticated_user, db_session
 ):
+    company = await create_company(db_session)
+    cid = company.id
     db_session.add(
         Settlement(
+            company_id=cid,
             purchase_ym="202401",
             purchase_year=2024,
             client_name="기존고객",
@@ -160,6 +164,7 @@ async def test_import_replaces_year_and_rejects_other_year(
     )
     db_session.add(
         Settlement(
+            company_id=cid,
             purchase_ym="202501",
             purchase_year=2025,
             client_name="타년도고객",
@@ -211,7 +216,7 @@ async def test_import_replaces_year_and_rejects_other_year(
     res = await test_client.post(
         "/settlements/import",
         headers=authenticated_user["headers"],
-        data={"year": "2024"},
+        data={"year": "2024", "company_id": str(cid)},
         files={
             "file": (
                 "settlements.xlsx",
@@ -230,7 +235,7 @@ async def test_import_replaces_year_and_rejects_other_year(
     list_2024 = await test_client.get(
         "/settlements",
         headers=authenticated_user["headers"],
-        params={"year": 2024, "page": 1, "size": 20},
+        params={"year": 2024, "company_id": cid, "page": 1, "size": 20},
     )
     assert list_2024.status_code == 200
     data_2024 = list_2024.json()
@@ -240,7 +245,7 @@ async def test_import_replaces_year_and_rejects_other_year(
     list_2025 = await test_client.get(
         "/settlements",
         headers=authenticated_user["headers"],
-        params={"year": 2025, "page": 1, "size": 20},
+        params={"year": 2025, "company_id": cid, "page": 1, "size": 20},
     )
     assert list_2025.status_code == 200
     data_2025 = list_2025.json()
@@ -250,9 +255,12 @@ async def test_import_replaces_year_and_rejects_other_year(
 
 @pytest.mark.asyncio
 async def test_list_settlements_filters(test_client, authenticated_user, db_session):
+    company = await create_company(db_session)
+    cid = company.id
     db_session.add_all(
         [
             Settlement(
+                company_id=cid,
                 purchase_ym="202401",
                 purchase_year=2024,
                 client_name="휴넷",
@@ -260,6 +268,7 @@ async def test_list_settlements_filters(test_client, authenticated_user, db_sess
                 settlement_amount=100,
             ),
             Settlement(
+                company_id=cid,
                 purchase_ym="202402",
                 purchase_year=2024,
                 client_name="러닝팩토리",
@@ -267,6 +276,7 @@ async def test_list_settlements_filters(test_client, authenticated_user, db_sess
                 settlement_amount=200,
             ),
             Settlement(
+                company_id=cid,
                 purchase_ym="202501",
                 purchase_year=2025,
                 client_name="휴넷",
@@ -280,7 +290,7 @@ async def test_list_settlements_filters(test_client, authenticated_user, db_sess
     res = await test_client.get(
         "/settlements",
         headers=authenticated_user["headers"],
-        params={"year": 2024, "client_name": "휴넷", "page": 1, "size": 20},
+        params={"year": 2024, "company_id": cid, "client_name": "휴넷", "page": 1, "size": 20},
     )
     assert res.status_code == 200
     data = res.json()
@@ -290,7 +300,7 @@ async def test_list_settlements_filters(test_client, authenticated_user, db_sess
     res2 = await test_client.get(
         "/settlements",
         headers=authenticated_user["headers"],
-        params={"course_name": "블록체인", "page": 1, "size": 20},
+        params={"company_id": cid, "course_name": "블록체인", "page": 1, "size": 20},
     )
     assert res2.status_code == 200
     assert res2.json()["total"] == 1

@@ -14,6 +14,7 @@ import {
   type OwnedSettlementCompareResult,
   type OwnedSettlementCompareStatus,
 } from "@/components/actions/settlements-action";
+import { CompanySelect } from "@/components/company-select";
 import { PagePagination } from "@/components/page-pagination";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,6 +46,7 @@ import { formatDateTimeInSeoul, getSettlementCompareYearOptions } from "@/lib/da
 
 type Props = {
   year?: number;
+  companyId?: number;
   tab: OwnedSettlementCompareStatus;
   page: number;
   size: number;
@@ -119,6 +121,7 @@ function CompareTable({
 
 export function CompareOwnedClient({
   year,
+  companyId,
   tab,
   page,
   size,
@@ -132,6 +135,9 @@ export function CompareOwnedClient({
   const initialYear =
     year != null && yearOptions.includes(year) ? year : defaultYear;
   const [yearInput, setYearInput] = useState(String(initialYear));
+  const [companyInput, setCompanyInput] = useState(
+    companyId != null ? String(companyId) : "",
+  );
   const [mapInst, setMapInst] = useState<string | null>(null);
   const [clientName, setClientName] = useState("");
   const [mapError, setMapError] = useState<string | null>(null);
@@ -159,17 +165,23 @@ export function CompareOwnedClient({
   const buildCompareUrl = (
     next: {
       year?: number;
+      companyId?: number;
       tab?: OwnedSettlementCompareStatus;
       page?: number;
       size?: number;
     },
   ) => {
     const y = next.year ?? year ?? Number(yearInput);
+    const c =
+      next.companyId ??
+      companyId ??
+      (companyInput ? Number(companyInput) : undefined);
     const t = next.tab ?? tab;
     const p = next.page ?? 1;
     const s = next.size ?? size;
     const q = new URLSearchParams();
     q.set("year", String(y));
+    if (c != null && Number.isFinite(c)) q.set("company_id", String(c));
     q.set("tab", t);
     q.set("page", String(p));
     q.set("size", String(s));
@@ -186,21 +198,40 @@ export function CompareOwnedClient({
     router.push(buildCompareUrl({ year: y, tab: "unsettled", page: 1 }));
   };
 
+  const onCompanyChange = (value: string) => {
+    setCompanyInput(value);
+    const c = Number(value);
+    if (!Number.isFinite(c) || c <= 0) return;
+    setCompareError(null);
+    setRefreshError(null);
+    setRefreshMessage(null);
+    router.push(
+      buildCompareUrl({ companyId: c, tab: "unsettled", page: 1 }),
+    );
+  };
+
   const onCompare = async (e: React.FormEvent) => {
     e.preventDefault();
     const y = Number(yearInput);
+    const c = Number(companyInput);
     if (!yearOptions.includes(y)) return;
+    if (!Number.isFinite(c) || c <= 0) {
+      setCompareError("업체를 선택하세요.");
+      return;
+    }
     setComparing(true);
     setCompareError(null);
     setRefreshError(null);
     setRefreshMessage(null);
-    const res = await runOwnedSettlementCompare(y);
+    const res = await runOwnedSettlementCompare(y, c);
     setComparing(false);
     if ("message" in res) {
       setCompareError(res.message);
       return;
     }
-    router.push(buildCompareUrl({ year: y, tab: "unsettled", page: 1 }));
+    router.push(
+      buildCompareUrl({ year: y, companyId: c, tab: "unsettled", page: 1 }),
+    );
     router.refresh();
   };
 
@@ -208,17 +239,23 @@ export function CompareOwnedClient({
     const next = value as OwnedSettlementCompareStatus;
     if (!yearOptions.includes(Number(yearInput)) && year == null) return;
     const y = year ?? Number(yearInput);
-    router.push(buildCompareUrl({ year: y, tab: next, page: 1 }));
+    const c = companyId ?? Number(companyInput);
+    router.push(buildCompareUrl({ year: y, companyId: c, tab: next, page: 1 }));
   };
 
   const onRefresh = async () => {
     const y = Number(yearInput);
+    const c = Number(companyInput);
     if (!yearOptions.includes(y)) return;
+    if (!Number.isFinite(c) || c <= 0) {
+      setRefreshError("업체를 선택하세요.");
+      return;
+    }
     setRefreshing(true);
     setRefreshError(null);
     setRefreshMessage(null);
 
-    const enqueued = await refreshOwnedCourseOpenings(y);
+    const enqueued = await refreshOwnedCourseOpenings(y, c);
     if ("message" in enqueued) {
       setRefreshing(false);
       setRefreshError(enqueued.message);
@@ -262,7 +299,7 @@ export function CompareOwnedClient({
     setRefreshMessage(
       `${job.year}년 개설 보유과정 ${(job.row_count ?? 0).toLocaleString()}건을 추출했습니다. 「비교」로 결과를 갱신하세요.`,
     );
-    router.push(buildCompareUrl({ year: y, tab, page: 1 }));
+    router.push(buildCompareUrl({ year: y, companyId: c, tab, page: 1 }));
     router.refresh();
   };
 
@@ -288,11 +325,22 @@ export function CompareOwnedClient({
   const totalItems = itemsPage?.total ?? 0;
   const totalPages = Math.max(1, itemsPage?.pages ?? 1);
   const paginationExtra =
-    year != null ? `year=${year}&tab=${tab}` : undefined;
+    year != null && companyId != null
+      ? `year=${year}&company_id=${companyId}&tab=${tab}`
+      : undefined;
 
   return (
     <div className="space-y-6">
       <form onSubmit={onCompare} className="flex flex-wrap items-end gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="company_id">업체</Label>
+          <CompanySelect
+            id="company_id"
+            value={companyInput}
+            onValueChange={onCompanyChange}
+            className="w-48"
+          />
+        </div>
         <div className="space-y-2">
           <Label htmlFor="year">비교 연도</Label>
           <Select value={yearInput} onValueChange={onYearChange}>
@@ -319,10 +367,10 @@ export function CompareOwnedClient({
         >
           {refreshing ? "추출 중…" : "추출/갱신"}
         </Button>
-        {hasResult && year != null ? (
+        {hasResult && year != null && companyId != null ? (
           <Button type="button" variant="outline" asChild>
             <a
-              href={`/api/settlements/compare-owned/export?year=${year}`}
+              href={`/api/settlements/compare-owned/export?year=${year}&company_id=${companyId}`}
               download
             >
               내보내기

@@ -6,7 +6,16 @@ from fastapi_users.password import PasswordHelper
 import uuid
 
 from app.config import settings
-from app.models import User, Base
+from app.models import Company, User, Base
+
+
+async def create_company(db_session, name: str = "테스트업체") -> Company:
+    """테스트용 업체 생성."""
+    row = Company(name=name, is_active=True)
+    db_session.add(row)
+    await db_session.commit()
+    await db_session.refresh(row)
+    return row
 
 from app.database import get_user_db, get_async_session
 from app.main import app

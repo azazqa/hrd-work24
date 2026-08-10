@@ -43,6 +43,18 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     pass
 
 
+class Company(Base):
+    """업체 마스터 (보유과정·정산·비교 스코프)."""
+
+    __tablename__ = "companies"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False, unique=True, index=True)
+    is_active = Column(
+        Boolean, nullable=False, default=True, server_default="true", index=True
+    )
+
+
 class SchedulerJobLog(Base):
     """
     스케줄러 잡 실행 이력 테이블.
@@ -113,6 +125,9 @@ class OwnedCourse(Base):
     __tablename__ = "owned_courses"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
+    company_id = Column(
+        BigInteger, ForeignKey("companies.id"), nullable=True, index=True
+    )
     dev_year = Column(Integer, nullable=True, index=True)
     dev_round = Column(String(50), nullable=True)
     review_round = Column(String(50), nullable=True)
@@ -164,6 +179,9 @@ class Settlement(Base):
     __tablename__ = "settlements"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
+    company_id = Column(
+        BigInteger, ForeignKey("companies.id"), nullable=True, index=True
+    )
     purchase_ym = Column(String(6), nullable=False)
     purchase_year = Column(Integer, nullable=False, index=True)
     sales_ym = Column(String(6), nullable=True)
@@ -192,6 +210,7 @@ class SettlementConsolidated(ViewBase):
 
     __tablename__ = "settlements_consolidated"
 
+    company_id = Column(BigInteger, primary_key=True, nullable=True)
     purchase_ym = Column(String(6), primary_key=True)
     purchase_year = Column(Integer, primary_key=True)
     sales_ym = Column(String(6), primary_key=True, nullable=True)
@@ -217,6 +236,9 @@ class SeparateSettlement(Base):
     __tablename__ = "separate_settlements"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
+    company_id = Column(
+        BigInteger, ForeignKey("companies.id"), nullable=True, index=True
+    )
     invoice_deadline_date = Column(Date, nullable=True, index=True)
     invoice_deadline_year = Column(Integer, nullable=True, index=True)
     sales_rep = Column(String(100), nullable=True)
@@ -249,11 +271,14 @@ class ClientNameMapping(Base):
 
 
 class OwnedCourseOpening(Base):
-    """개설된 보유과정 캐시 (ES 추출 스냅샷, 연도별 교체)."""
+    """개설된 보유과정 캐시 (ES 추출 스냅샷, 연도·업체별 교체)."""
 
     __tablename__ = "owned_course_openings"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
+    company_id = Column(
+        BigInteger, ForeignKey("companies.id"), nullable=True, index=True
+    )
     year = Column(Integer, nullable=False, index=True)
     institution_name = Column(String(255), nullable=True)
     course_name = Column(String(500), nullable=True)
@@ -264,15 +289,23 @@ class OwnedCourseOpening(Base):
 
     __table_args__ = (
         Index("ix_owned_course_openings_year_tra_start", "year", "tra_start_date"),
+        Index(
+            "ix_owned_course_openings_company_year",
+            "company_id",
+            "year",
+        ),
     )
 
 
 class OwnedSettlementCompareResultRow(Base):
-    """보유과정 정산 비교 결과 스냅샷 (연도별 delete&insert)."""
+    """보유과정 정산 비교 결과 스냅샷 (연도·업체별 delete&insert)."""
 
     __tablename__ = "owned_settlement_compare_results"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
+    company_id = Column(
+        BigInteger, ForeignKey("companies.id"), nullable=True, index=True
+    )
     year = Column(Integer, nullable=False, index=True)
     status = Column(String(20), nullable=False, index=True)
     institution_name = Column(String(255), nullable=True)
@@ -285,6 +318,11 @@ class OwnedSettlementCompareResultRow(Base):
 
     __table_args__ = (
         Index("ix_owned_settlement_compare_results_year_status", "year", "status"),
+        Index(
+            "ix_owned_settlement_compare_results_company_year",
+            "company_id",
+            "year",
+        ),
     )
 
 

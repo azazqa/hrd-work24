@@ -354,6 +354,10 @@ export type LegacyIndexResponse = {
  */
 export type OwnedCourseCreate = {
   /**
+   * Company Id
+   */
+  company_id: number;
+  /**
    * Dev Year
    */
   dev_year?: number | null;
@@ -456,6 +460,10 @@ export type OwnedCourseListItem = {
    */
   id: number;
   /**
+   * Company Id
+   */
+  company_id: number | null;
+  /**
    * Dev Year
    */
   dev_year: number | null;
@@ -481,6 +489,10 @@ export type OwnedCourseRead = {
    * Id
    */
   id: number;
+  /**
+   * Company Id
+   */
+  company_id: number | null;
   /**
    * Dev Year
    */
@@ -551,6 +563,10 @@ export type OwnedCourseRead = {
  * OwnedCourseUpdate
  */
 export type OwnedCourseUpdate = {
+  /**
+   * Company Id
+   */
+  company_id: number;
   /**
    * Dev Year
    */
@@ -2149,6 +2165,11 @@ export type ListOwnedCoursesData = {
      * 과정명 검색
      */
     q?: string | null;
+    /**
+     * Company Id
+     * 업체 ID
+     */
+    company_id?: number | null;
     /**
      * Is Active
      */

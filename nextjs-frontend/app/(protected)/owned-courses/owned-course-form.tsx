@@ -10,6 +10,7 @@ import {
   deleteOwnedCourseAction,
   updateOwnedCourseAction,
 } from "@/components/actions/owned-courses-action";
+import { CompanySelect } from "@/components/company-select";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldGroup, FieldLabel, FieldSet } from "@/components/ui/field";
@@ -17,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export type OwnedCourseFormValues = {
+  company_id: string;
   dev_year: string;
   dev_round: string;
   review_round: string;
@@ -34,6 +36,7 @@ export type OwnedCourseFormValues = {
 };
 
 const emptyForm: OwnedCourseFormValues = {
+  company_id: "",
   dev_year: "",
   dev_round: "",
   review_round: "",
@@ -64,6 +67,7 @@ function parseOptionalStr(value: string): string | null {
 
 function toFormValues(row: OwnedCourseRead): OwnedCourseFormValues {
   return {
+    company_id: row.company_id != null ? String(row.company_id) : "",
     dev_year: row.dev_year != null ? String(row.dev_year) : "",
     dev_round: row.dev_round != null ? String(row.dev_round) : "",
     review_round: row.review_round ?? "",
@@ -86,7 +90,12 @@ function toPayload(form: OwnedCourseFormValues) {
   if (!course_name) {
     throw new Error("과정명을 입력하세요.");
   }
+  const company_id = Number(form.company_id);
+  if (!Number.isFinite(company_id) || company_id <= 0) {
+    throw new Error("업체를 선택하세요.");
+  }
   return {
+    company_id,
     dev_year: parseOptionalInt(form.dev_year),
     dev_round: parseOptionalStr(form.dev_round),
     review_round: parseOptionalStr(form.review_round),
@@ -181,6 +190,14 @@ export function OwnedCourseForm({ mode, courseId, initial }: Props) {
     <form onSubmit={handleSubmit}>
       <FieldSet>
         <FieldGroup className="grid gap-4 sm:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="company_id">업체</FieldLabel>
+            <CompanySelect
+              id="company_id"
+              value={form.company_id}
+              onValueChange={(v) => setField("company_id", v)}
+            />
+          </Field>
           <Field>
             <FieldLabel htmlFor="dev_year">개발년도</FieldLabel>
             <Input

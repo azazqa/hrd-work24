@@ -14,6 +14,11 @@ from app.models import (
     Settlement,
 )
 from app.routes.settlements import _refresh_settlements_consolidated
+from tests.conftest import create_company
+
+
+def _compare_qs(year: int, company_id: int) -> str:
+    return f"year={year}&company_id={company_id}"
 
 
 async def _seed_and_refresh_mv(db_session, *rows):
@@ -23,17 +28,20 @@ async def _seed_and_refresh_mv(db_session, *rows):
     await _refresh_settlements_consolidated(db_session)
 
 
-
 @pytest.mark.asyncio
 async def test_get_compare_reads_stored_results_only(
     test_client, authenticated_user, db_session
 ):
     headers = authenticated_user["headers"]
+    company = await create_company(db_session)
     extracted_at = datetime.now(timezone.utc)
+    cid = company.id
+    qs = _compare_qs(2024, cid)
     await _seed_and_refresh_mv(
         db_session,
         ClientNameMapping(institution_name="기관A", client_name="고객A"),
         OwnedCourseOpening(
+            company_id=cid,
             year=2024,
             institution_name="기관A",
             course_name="과정매칭",
@@ -43,6 +51,7 @@ async def test_get_compare_reads_stored_results_only(
             extracted_at=extracted_at,
         ),
         OwnedCourseOpening(
+            company_id=cid,
             year=2024,
             institution_name="기관A",
             course_name="과정미정산",
@@ -50,6 +59,7 @@ async def test_get_compare_reads_stored_results_only(
             extracted_at=extracted_at,
         ),
         Settlement(
+            company_id=cid,
             purchase_ym="202405",
             purchase_year=2024,
             client_name="고객A",
@@ -60,7 +70,7 @@ async def test_get_compare_reads_stored_results_only(
     )
 
     empty = await test_client.get(
-        "/settlements/compare-owned?year=2024",
+        f"/settlements/compare-owned?{qs}",
         headers=headers,
     )
     assert empty.status_code == 200, empty.text
@@ -68,13 +78,13 @@ async def test_get_compare_reads_stored_results_only(
     assert empty.json()["total"] == 0
 
     export_before = await test_client.get(
-        "/settlements/compare-owned/export?year=2024",
+        f"/settlements/compare-owned/export?{qs}",
         headers=headers,
     )
     assert export_before.status_code == 404
 
     run = await test_client.post(
-        "/settlements/compare-owned?year=2024",
+        f"/settlements/compare-owned?{qs}",
         headers=headers,
     )
     assert run.status_code == 200, run.text
@@ -90,7 +100,8 @@ async def test_get_compare_reads_stored_results_only(
     stored = (
         await db_session.execute(
             select(OwnedSettlementCompareResultRow).where(
-                OwnedSettlementCompareResultRow.year == 2024
+                OwnedSettlementCompareResultRow.year == 2024,
+                OwnedSettlementCompareResultRow.company_id == cid,
             )
         )
     ).scalars().all()
@@ -98,20 +109,21 @@ async def test_get_compare_reads_stored_results_only(
 
     # GET does not rewrite rows
     again = await test_client.get(
-        "/settlements/compare-owned?year=2024",
+        f"/settlements/compare-owned?{qs}",
         headers=headers,
     )
     assert again.status_code == 200
     assert again.json()["matched"] == 1
     count_after_get = await db_session.scalar(
         select(func.count()).select_from(OwnedSettlementCompareResultRow).where(
-            OwnedSettlementCompareResultRow.year == 2024
+            OwnedSettlementCompareResultRow.year == 2024,
+            OwnedSettlementCompareResultRow.company_id == cid,
         )
     )
     assert count_after_get == 2
 
     matched = await test_client.get(
-        "/settlements/compare-owned/items?year=2024&status=matched&page=1&size=50",
+        f"/settlements/compare-owned/items?{qs}&status=matched&page=1&size=50",
         headers=headers,
     )
     assert matched.status_code == 200, matched.text
@@ -121,7 +133,7 @@ async def test_get_compare_reads_stored_results_only(
     assert matched_body["items"][0]["client_name"] == "고객A"
 
     export_res = await test_client.get(
-        "/settlements/compare-owned/export?year=2024",
+        f"/settlements/compare-owned/export?{qs}",
         headers=headers,
     )
     assert export_res.status_code == 200, export_res.text
@@ -139,11 +151,15 @@ async def test_post_compare_replaces_year_rows(
     test_client, authenticated_user, db_session
 ):
     headers = authenticated_user["headers"]
+    company = await create_company(db_session)
     extracted_at = datetime.now(timezone.utc)
+    cid = company.id
+    qs = _compare_qs(2024, cid)
     await _seed_and_refresh_mv(
         db_session,
         ClientNameMapping(institution_name="기관A", client_name="고객A"),
         OwnedCourseOpening(
+            company_id=cid,
             year=2024,
             institution_name="기관A",
             course_name="과정1",
@@ -153,13 +169,14 @@ async def test_post_compare_replaces_year_rows(
     )
 
     first = await test_client.post(
-        "/settlements/compare-owned?year=2024", headers=headers
+        f"/settlements/compare-owned?{qs}", headers=headers
     )
     assert first.status_code == 200
     assert first.json()["unsettled"] == 1
 
     db_session.add(
         OwnedCourseOpening(
+            company_id=cid,
             year=2024,
             institution_name="기관A",
             course_name="과정2",
@@ -170,7 +187,7 @@ async def test_post_compare_replaces_year_rows(
     await db_session.commit()
 
     second = await test_client.post(
-        "/settlements/compare-owned?year=2024", headers=headers
+        f"/settlements/compare-owned?{qs}", headers=headers
     )
     assert second.status_code == 200
     assert second.json()["total"] == 2
@@ -178,7 +195,8 @@ async def test_post_compare_replaces_year_rows(
     rows = (
         await db_session.execute(
             select(OwnedSettlementCompareResultRow).where(
-                OwnedSettlementCompareResultRow.year == 2024
+                OwnedSettlementCompareResultRow.year == 2024,
+                OwnedSettlementCompareResultRow.company_id == cid,
             )
         )
     ).scalars().all()
@@ -191,10 +209,13 @@ async def test_compare_auto_registers_identity_mapping(
     test_client, authenticated_user, db_session
 ):
     headers = authenticated_user["headers"]
+    company = await create_company(db_session)
     extracted_at = datetime.now(timezone.utc)
+    cid = company.id
     await _seed_and_refresh_mv(
         db_session,
         OwnedCourseOpening(
+            company_id=cid,
             year=2024,
             institution_name="동일고객사",
             course_name="과정자동",
@@ -203,6 +224,7 @@ async def test_compare_auto_registers_identity_mapping(
             extracted_at=extracted_at,
         ),
         Settlement(
+            company_id=cid,
             purchase_ym="202404",
             purchase_year=2024,
             client_name="동일고객사",
@@ -213,7 +235,7 @@ async def test_compare_auto_registers_identity_mapping(
     )
 
     res = await test_client.post(
-        "/settlements/compare-owned?year=2024",
+        f"/settlements/compare-owned?{_compare_qs(2024, cid)}",
         headers=headers,
     )
     assert res.status_code == 200, res.text
@@ -237,10 +259,13 @@ async def test_compare_auto_registers_mapping_ignoring_internal_spaces(
     test_client, authenticated_user, db_session
 ):
     headers = authenticated_user["headers"]
+    company = await create_company(db_session)
     extracted_at = datetime.now(timezone.utc)
+    cid = company.id
     await _seed_and_refresh_mv(
         db_session,
         OwnedCourseOpening(
+            company_id=cid,
             year=2024,
             institution_name="에이 비씨",
             course_name="과정공백",
@@ -249,6 +274,7 @@ async def test_compare_auto_registers_mapping_ignoring_internal_spaces(
             extracted_at=extracted_at,
         ),
         Settlement(
+            company_id=cid,
             purchase_ym="202407",
             purchase_year=2024,
             client_name="에이비씨",
@@ -259,7 +285,7 @@ async def test_compare_auto_registers_mapping_ignoring_internal_spaces(
     )
 
     res = await test_client.post(
-        "/settlements/compare-owned?year=2024",
+        f"/settlements/compare-owned?{_compare_qs(2024, cid)}",
         headers=headers,
     )
     assert res.status_code == 200, res.text
@@ -324,6 +350,7 @@ def test_aggregate_owned_opening_rows_sums_headcount_and_skips_non_numeric():
             },
         ],
         year=2024,
+        company_id=1,
         extracted_at=extracted_at,
     )
     assert len(rows) == 2
@@ -338,7 +365,9 @@ async def test_compare_does_not_revive_soft_deleted_mapping(
     test_client, authenticated_user, db_session
 ):
     headers = authenticated_user["headers"]
+    company = await create_company(db_session)
     extracted_at = datetime.now(timezone.utc)
+    cid = company.id
     await _seed_and_refresh_mv(
         db_session,
         ClientNameMapping(
@@ -347,6 +376,7 @@ async def test_compare_does_not_revive_soft_deleted_mapping(
             is_delete=True,
         ),
         OwnedCourseOpening(
+            company_id=cid,
             year=2024,
             institution_name="삭제된기관",
             course_name="과정",
@@ -354,6 +384,7 @@ async def test_compare_does_not_revive_soft_deleted_mapping(
             extracted_at=extracted_at,
         ),
         Settlement(
+            company_id=cid,
             purchase_ym="202401",
             purchase_year=2024,
             client_name="삭제된기관",
@@ -363,7 +394,7 @@ async def test_compare_does_not_revive_soft_deleted_mapping(
     )
 
     res = await test_client.post(
-        "/settlements/compare-owned?year=2024",
+        f"/settlements/compare-owned?{_compare_qs(2024, cid)}",
         headers=headers,
     )
     assert res.status_code == 200, res.text
@@ -386,14 +417,17 @@ async def test_refresh_enqueues_scheduler_queue(
     test_client, authenticated_user, db_session
 ):
     headers = authenticated_user["headers"]
+    company = await create_company(db_session)
+    qs = _compare_qs(2024, company.id)
 
     res = await test_client.post(
-        "/settlements/compare-owned/refresh?year=2024",
+        f"/settlements/compare-owned/refresh?{qs}",
         headers=headers,
     )
     assert res.status_code == 202, res.text
     body = res.json()
     assert body["year"] == 2024
+    assert body["company_id"] == company.id
     assert body["status"] == "PENDING"
     queue_id = body["id"]
 
@@ -401,10 +435,11 @@ async def test_refresh_enqueues_scheduler_queue(
     assert queue is not None
     assert queue.job_key == "owned_course_opening_extract"
     assert queue.payload["year"] == 2024
+    assert queue.payload["company_id"] == company.id
     assert queue.payload["queue_id"] == queue_id
 
     again = await test_client.post(
-        "/settlements/compare-owned/refresh?year=2024",
+        f"/settlements/compare-owned/refresh?{qs}",
         headers=headers,
     )
     assert again.status_code == 202
@@ -415,9 +450,12 @@ async def test_refresh_enqueues_scheduler_queue(
 async def test_extract_replaces_year_cache(db_session):
     from scheduler.jobs.owned_course_opening_extract import _run_extract
 
+    company = await create_company(db_session)
+    cid = company.id
     old_at = datetime(2024, 1, 1, tzinfo=timezone.utc)
     db_session.add(
         OwnedCourseOpening(
+            company_id=cid,
             year=2024,
             institution_name="구기관",
             course_name="구과정",
@@ -429,7 +467,7 @@ async def test_extract_replaces_year_cache(db_session):
         job_key="owned_course_opening_extract",
         action="RUN_NOW",
         status="PROCESSING",
-        payload={"year": 2024, "min_score": 0},
+        payload={"year": 2024, "company_id": cid, "min_score": 0},
     )
     db_session.add(q)
     await db_session.commit()
@@ -480,22 +518,27 @@ async def test_extract_replaces_year_cache(db_session):
     ):
         es_cls.return_value.close = AsyncMock()
         result = await _run_extract(
-            {"year": 2024, "min_score": 0, "queue_id": q.id}
+            {"year": 2024, "company_id": cid, "min_score": 0, "queue_id": q.id}
         )
 
     build_body.assert_called_once_with(
         ["신과정"], 2024, 0.0, has_reg_course_man=True
     )
     assert result["row_count"] == 2
+    assert result["company_id"] == cid
     assert result["source_row_count"] == 3
     await db_session.refresh(q)
     assert q.payload["row_count"] == 2
+    assert q.payload["company_id"] == cid
     assert q.payload["source_row_count"] == 3
     assert q.payload.get("extracted_at")
 
     rows_2024 = (
         await db_session.execute(
-            select(OwnedCourseOpening).where(OwnedCourseOpening.year == 2024)
+            select(OwnedCourseOpening).where(
+                OwnedCourseOpening.year == 2024,
+                OwnedCourseOpening.company_id == cid,
+            )
         )
     ).scalars().all()
     assert len(rows_2024) == 2

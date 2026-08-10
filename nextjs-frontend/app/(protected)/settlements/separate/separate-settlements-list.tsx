@@ -11,18 +11,35 @@ import {
 
 import { SeparateExcelImportDialog } from "./excel-import-dialog";
 
-export function SeparateSettlementsListHeader() {
+export function SeparateSettlementsListHeader({
+  companyId,
+}: {
+  companyId?: string;
+}) {
+  const exportHref = companyId
+    ? `/api/settlements/separate/export?company_id=${encodeURIComponent(companyId)}`
+    : undefined;
+
   return (
     <div className="mb-4 flex items-center justify-between flex-wrap gap-2">
       <h2 className="text-xl font-semibold">별도 정산 목록</h2>
       <div className="flex flex-wrap gap-2">
-        <a
-          href="/api/settlements/separate/export"
-          download
-          className="inline-flex h-9 items-center rounded-md border px-3 text-sm hover:bg-muted"
-        >
-          내보내기
-        </a>
+        {exportHref ? (
+          <a
+            href={exportHref}
+            download
+            className="inline-flex h-9 items-center rounded-md border px-3 text-sm hover:bg-muted"
+          >
+            내보내기
+          </a>
+        ) : (
+          <span
+            className="inline-flex h-9 items-center rounded-md border px-3 text-sm text-muted-foreground"
+            title="업체를 선택한 뒤 내보내기할 수 있습니다"
+          >
+            내보내기
+          </span>
+        )}
         <SeparateExcelImportDialog />
       </div>
     </div>

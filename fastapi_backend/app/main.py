@@ -6,6 +6,7 @@ from app.config import settings
 from app.routes.admin_scheduler import router as admin_scheduler_router
 from app.routes.auth_refresh import router as auth_refresh_router
 from app.routes.client_mappings import router as client_mappings_router
+from app.routes.companies import router as companies_router
 from app.routes.courses import router as courses_router
 from app.routes.owned_courses import router as owned_courses_router
 from app.routes.separate_settlements import router as separate_settlements_router
@@ -54,6 +55,12 @@ app.include_router(
     admin_scheduler_router,
     prefix="/admin/scheduler",
     tags=["admin-scheduler"],
+)
+
+app.include_router(
+    companies_router,
+    prefix="/companies",
+    tags=["companies"],
 )
 
 app.include_router(

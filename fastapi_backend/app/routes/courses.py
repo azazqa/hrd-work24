@@ -348,11 +348,25 @@ def _build_list_scroll_body(
     }
 
 
-async def _load_active_owned_names(session: AsyncSession) -> list[str]:
+async def _load_active_owned_names(
+    session: AsyncSession,
+    *,
+    usable_in_year: int | None = None,
+    company_id: int | None = None,
+) -> list[str]:
     stmt = select(OwnedCourse.course_name).where(
         OwnedCourse.is_delete == False,  # noqa: E712
         OwnedCourse.is_active == True,  # noqa: E712
     )
+    if company_id is not None:
+        stmt = stmt.where(OwnedCourse.company_id == company_id)
+    if usable_in_year is not None:
+        # 개발년도가 추출 연도~연도-2 범위인 과정만 (개발년도 미기재는 제외)
+        stmt = stmt.where(
+            OwnedCourse.dev_year.is_not(None),
+            OwnedCourse.dev_year >= usable_in_year - 2,
+            OwnedCourse.dev_year <= usable_in_year,
+        )
     rows = (await session.execute(stmt)).scalars().all()
     return sorted({(n or "").strip() for n in rows if n and n.strip()})
 

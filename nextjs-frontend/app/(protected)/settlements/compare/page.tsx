@@ -1,3 +1,4 @@
+import { fetchCompanies } from "@/components/actions/companies-action";
 import {
   compareOwnedSettlements,
   fetchCompareOwnedItems,
@@ -19,6 +20,7 @@ const TABS: OwnedSettlementCompareStatus[] = [
 interface PageProps {
   searchParams: Promise<{
     year?: string;
+    company_id?: string;
     tab?: string;
     page?: string;
     size?: string;
@@ -36,9 +38,26 @@ export default async function CompareOwnedPage({ searchParams }: PageProps) {
       ? yearNum
       : defaultYear;
 
-  if (!yearRaw || yearNum !== year) {
+  const companies = await fetchCompanies(1, 200, { is_active: true });
+  const companyItems = "message" in companies ? [] : (companies.items ?? []);
+  const companyIdRaw = params.company_id?.trim();
+  const companyIdNum = companyIdRaw ? Number(companyIdRaw) : undefined;
+  const defaultCompanyId = companyItems[0]?.id;
+  const companyId =
+    companyIdNum != null &&
+    Number.isFinite(companyIdNum) &&
+    companyItems.some((c) => c.id === companyIdNum)
+      ? companyIdNum
+      : defaultCompanyId;
+
+  if (
+    !yearRaw ||
+    yearNum !== year ||
+    (companyId != null && (!companyIdRaw || companyIdNum !== companyId))
+  ) {
     const q = new URLSearchParams();
     q.set("year", String(year));
+    if (companyId != null) q.set("company_id", String(companyId));
     q.set("tab", "unsettled");
     q.set("page", "1");
     q.set("size", params.size?.trim() || "50");
@@ -65,17 +84,27 @@ export default async function CompareOwnedPage({ searchParams }: PageProps) {
   let itemsPage = null;
   let error: string | null = null;
 
-  const data = await compareOwnedSettlements(year);
-  if ("message" in data) {
-    error = data.message;
+  if (companyId == null) {
+    error = "업체를 먼저 등록하세요.";
   } else {
-    result = data;
-    if (data.has_result || data.cache_hit) {
-      const items = await fetchCompareOwnedItems(year, tab, page, size);
-      if ("message" in items) {
-        error = items.message;
-      } else {
-        itemsPage = items;
+    const data = await compareOwnedSettlements(year, companyId);
+    if ("message" in data) {
+      error = data.message;
+    } else {
+      result = data;
+      if (data.has_result || data.cache_hit) {
+        const items = await fetchCompareOwnedItems(
+          year,
+          companyId,
+          tab,
+          page,
+          size,
+        );
+        if ("message" in items) {
+          error = items.message;
+        } else {
+          itemsPage = items;
+        }
       }
     }
   }
@@ -92,6 +121,7 @@ export default async function CompareOwnedPage({ searchParams }: PageProps) {
       <section className="rounded-lg bg-white p-6 shadow-lg dark:bg-gray-900">
         <CompareOwnedClient
           year={year}
+          companyId={companyId}
           tab={tab}
           page={page}
           size={size}

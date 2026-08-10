@@ -10,6 +10,7 @@ interface OwnedCoursesPageProps {
   searchParams: Promise<{
     page?: string;
     size?: string;
+    company_id?: string;
     q?: string;
     dev_year?: string;
     division?: string;
@@ -23,6 +24,7 @@ function buildExtraQuery(p: Awaited<OwnedCoursesPageProps["searchParams"]>): str
     const t = v?.trim();
     if (t) parts.push(`${encodeURIComponent(k)}=${encodeURIComponent(t)}`);
   };
+  add("company_id", p.company_id);
   add("q", p.q);
   add("dev_year", p.dev_year);
   add("division", p.division);
@@ -41,8 +43,12 @@ export default async function OwnedCoursesPage({ searchParams }: OwnedCoursesPag
     isActiveParam === "true" ? true : isActiveParam === "false" ? false : undefined;
   const devYearRaw = params.dev_year?.trim();
   const dev_year = devYearRaw ? Number(devYearRaw) : undefined;
+  const companyIdRaw = params.company_id?.trim();
+  const company_id = companyIdRaw ? Number(companyIdRaw) : undefined;
 
   const data = await fetchOwnedCourses(page, size, {
+    company_id:
+      company_id != null && Number.isFinite(company_id) ? company_id : undefined,
     q: params.q,
     is_active,
     dev_year: dev_year != null && Number.isFinite(dev_year) ? dev_year : undefined,
@@ -68,6 +74,7 @@ export default async function OwnedCoursesPage({ searchParams }: OwnedCoursesPag
         <OwnedCoursesSearchForm
           size={size}
           initial={{
+            company_id: params.company_id,
             q: params.q,
             dev_year: params.dev_year,
             division: params.division,

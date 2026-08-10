@@ -1,4 +1,4 @@
-import { BookMarked, BookOpen, Calculator, House, Users, type LucideIcon } from "lucide-react"
+import { BookMarked, BookOpen, Building2, Calculator, House, Users, type LucideIcon } from "lucide-react"
 
 export interface NavItem {
   title: string
@@ -15,6 +15,12 @@ export const navMain: NavItem[] = [
     title: "홈",
     url: "/",
     icon: House,
+    hasChildren: false,
+  },
+  {
+    title: "업체 관리",
+    url: "/companies",
+    icon: Building2,
     hasChildren: false,
   },
   {

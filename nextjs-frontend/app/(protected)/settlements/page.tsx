@@ -8,6 +8,7 @@ interface SettlementsPageProps {
   searchParams: Promise<{
     page?: string;
     size?: string;
+    company_id?: string;
     year?: string;
     client_name?: string;
     course_name?: string;
@@ -20,6 +21,7 @@ function buildExtraQuery(p: Awaited<SettlementsPageProps["searchParams"]>): stri
     const t = v?.trim();
     if (t) parts.push(`${encodeURIComponent(k)}=${encodeURIComponent(t)}`);
   };
+  add("company_id", p.company_id);
   add("year", p.year);
   add("client_name", p.client_name);
   add("course_name", p.course_name);
@@ -36,9 +38,14 @@ export default async function SettlementsPage({ searchParams }: SettlementsPageP
   const yearNum = yearRaw ? Number(yearRaw) : undefined;
   const year =
     yearNum != null && Number.isFinite(yearNum) ? yearNum : undefined;
+  const companyIdRaw = params.company_id?.trim();
+  const companyNum = companyIdRaw ? Number(companyIdRaw) : undefined;
+  const company_id =
+    companyNum != null && Number.isFinite(companyNum) ? companyNum : undefined;
 
   const data = await fetchSettlements(page, size, {
     year,
+    company_id,
     client_name: params.client_name,
     course_name: params.course_name,
   });
@@ -54,7 +61,7 @@ export default async function SettlementsPage({ searchParams }: SettlementsPageP
       <div className="mb-6">
         <h2 className="text-2xl font-semibold">일반 정산</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          정산 엑셀을 년도별로 업로드하고 고객사·과정명으로 조회합니다.
+          정산 엑셀을 업체·년도별로 업로드하고 고객사·과정명으로 조회합니다.
         </p>
       </div>
 
@@ -62,6 +69,7 @@ export default async function SettlementsPage({ searchParams }: SettlementsPageP
         <SettlementsSearchForm
           size={size}
           initial={{
+            company_id: params.company_id,
             year: params.year,
             client_name: params.client_name,
             course_name: params.course_name,
@@ -70,7 +78,7 @@ export default async function SettlementsPage({ searchParams }: SettlementsPageP
       </section>
 
       <section className="mt-8 rounded-lg bg-white p-6 shadow-lg dark:bg-gray-900">
-        <SettlementsListHeader />
+        <SettlementsListHeader companyId={params.company_id?.trim() || undefined} />
         {"message" in data ? (
           <p className="text-sm text-destructive">{data.message}</p>
         ) : (

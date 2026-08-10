@@ -45,6 +45,7 @@ from app.models import (
     User,
 )
 from app.pagination import MAX_PAGE_SIZE, Page, Params
+from app.routes.companies import require_active_company
 from app.routes.courses import (
     MAX_EXPORT_ROWS,
     SCROLL_BATCH_SIZE,
@@ -67,6 +68,7 @@ SETTLEMENTS_CONSOLIDATED_MV = "settlements_consolidated"
 CREATE_SETTLEMENTS_CONSOLIDATED_SQL = """
 CREATE MATERIALIZED VIEW settlements_consolidated AS
 SELECT
+  company_id,
   purchase_ym, purchase_year, sales_ym, client_name, course_name,
   education_period, education_period_date,
   SUM(headcount) AS headcount,
@@ -78,6 +80,7 @@ SELECT
 FROM settlements
 WHERE is_delete = false
 GROUP BY
+  company_id,
   purchase_ym, purchase_year, sales_ym, client_name, course_name,
   education_period, education_period_date,
   base_tuition, textbook_fee, exclude_amount, share_rate,
@@ -87,7 +90,7 @@ WITH DATA
 
 CREATE_SETTLEMENTS_CONSOLIDATED_INDEX_SQL = """
 CREATE INDEX ix_settlements_consolidated_match
-  ON settlements_consolidated (client_name, course_name, education_period_date)
+  ON settlements_consolidated (company_id, client_name, course_name, education_period_date)
 """
 
 EXCEL_HEADERS: list[tuple[str, str]] = [
@@ -370,7 +373,7 @@ def _resolve_contract_window(
 
 
 async def _collect_separate_opening_ids(
-    session: AsyncSession, year: int
+    session: AsyncSession, year: int, company_id: int
 ) -> set[int]:
     """별도 정산 계약기간에 포함되는 owned_course_openings.id 집합."""
     owned_rows = (
@@ -392,6 +395,7 @@ async def _collect_separate_opening_ids(
             .where(
                 OwnedCourseOpening.is_delete == False,  # noqa: E712
                 OwnedCourseOpening.year == year,
+                OwnedCourseOpening.company_id == company_id,
                 OwnedCourseOpening.tra_start_date.is_not(None),
             )
         )
@@ -412,7 +416,8 @@ async def _collect_separate_opening_ids(
     separate_rows = (
         await session.execute(
             select(SeparateSettlement).where(
-                SeparateSettlement.is_delete == False  # noqa: E712
+                SeparateSettlement.is_delete == False,  # noqa: E712
+                SeparateSettlement.company_id == company_id,
             )
         )
     ).scalars().all()
@@ -590,6 +595,7 @@ async def list_settlements(
     page: int = 1,
     size: int = 20,
     year: int | None = Query(default=None, description="매입년도"),
+    company_id: int | None = Query(default=None, description="업체 ID"),
     client_name: str | None = Query(default=None, description="고객사 검색"),
     course_name: str | None = Query(default=None, description="과정명 검색"),
     session: AsyncSession = Depends(get_async_session),
@@ -604,6 +610,8 @@ async def list_settlements(
     stmt = select(Settlement).where(Settlement.is_delete == False)  # noqa: E712
     if year is not None:
         stmt = stmt.where(Settlement.purchase_year == year)
+    if company_id is not None:
+        stmt = stmt.where(Settlement.company_id == company_id)
     if client_name and client_name.strip():
         stmt = stmt.where(Settlement.client_name.ilike(f"%{client_name.strip()}%"))
     if course_name and course_name.strip():
@@ -644,11 +652,18 @@ def _excel_cell_value(value: Any) -> Any:
 
 @router.get("/export")
 async def export_settlements_consolidated(
+    company_id: int = Query(..., description="업체 ID"),
     session: AsyncSession = Depends(get_async_session),
     _: User = Depends(current_active_user),
 ):
-    """정리된 정산 MV(settlements_consolidated) 전체를 xlsx로 내보낸다."""
-    total = await session.scalar(select(func.count()).select_from(SettlementConsolidated))
+    """정리된 정산 MV(settlements_consolidated)를 업체별로 xlsx로 내보낸다."""
+    await require_active_company(session, company_id)
+
+    total = await session.scalar(
+        select(func.count())
+        .select_from(SettlementConsolidated)
+        .where(SettlementConsolidated.company_id == company_id)
+    )
     total = int(total or 0)
     if total > MAX_EXPORT_ROWS:
         raise HTTPException(
@@ -658,7 +673,9 @@ async def export_settlements_consolidated(
 
     rows = (
         await session.execute(
-            select(SettlementConsolidated).order_by(
+            select(SettlementConsolidated)
+            .where(SettlementConsolidated.company_id == company_id)
+            .order_by(
                 SettlementConsolidated.purchase_ym.desc(),
                 SettlementConsolidated.client_name.asc(),
                 SettlementConsolidated.course_name.asc(),
@@ -693,10 +710,13 @@ async def export_settlements_consolidated(
 @router.post("/import", response_model=SettlementImportResult)
 async def import_settlements(
     year: int = Form(..., ge=2000, le=2100, description="교체할 매입년도"),
+    company_id: int = Form(..., description="업체 ID"),
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_async_session),
     _: User = Depends(current_active_user),
 ):
+    await require_active_company(session, company_id)
+
     if not file.filename or not file.filename.lower().endswith((".xlsx", ".xlsm")):
         raise HTTPException(status_code=400, detail="xlsx 파일만 업로드할 수 있습니다.")
 
@@ -738,6 +758,7 @@ async def import_settlements(
         .where(
             Settlement.is_delete == False,  # noqa: E712
             Settlement.purchase_year == year,
+            Settlement.company_id == company_id,
         )
         .values(is_delete=True)
     )
@@ -771,6 +792,7 @@ async def import_settlements(
                     )
                 )
                 continue
+            fields["company_id"] = company_id
             to_insert.append(Settlement(**fields))
             created += 1
         except Exception as exc:
@@ -806,6 +828,7 @@ class OwnedSettlementCompareResult(BaseModel):
     """비교 요약 (목록은 /compare-owned/items)."""
 
     year: int
+    company_id: int
     total: int
     matched: int
     partial: int = 0
@@ -823,6 +846,7 @@ class OwnedOpeningExtractQueueRead(BaseModel):
 
     id: int
     year: int
+    company_id: int | None = None
     status: str
     row_count: int | None = None
     extracted_at: datetime | None = None
@@ -835,6 +859,8 @@ def _queue_to_extract_read(row: SchedulerJobQueue) -> OwnedOpeningExtractQueueRe
     payload = dict(row.payload or {})
     year_raw = payload.get("year")
     year = int(year_raw) if year_raw is not None else 0
+    company_raw = payload.get("company_id")
+    company_id = int(company_raw) if company_raw is not None else None
     row_count_raw = payload.get("row_count")
     extracted_raw = payload.get("extracted_at")
     extracted_at: datetime | None = None
@@ -846,6 +872,7 @@ def _queue_to_extract_read(row: SchedulerJobQueue) -> OwnedOpeningExtractQueueRe
     return OwnedOpeningExtractQueueRead(
         id=row.id,
         year=year,
+        company_id=company_id,
         status=row.status,
         row_count=int(row_count_raw) if row_count_raw is not None else None,
         extracted_at=extracted_at,
@@ -926,10 +953,13 @@ def _sql_normalize_course_name(column):
     return func.regexp_replace(text, r"[^0-9A-Za-z가-힣]+", "", "g")
 
 
-def _compare_status_expr(separate_ids: Collection[int] | None = None):
+def _compare_status_expr(
+    company_id: int, separate_ids: Collection[int] | None = None
+):
     """보유과정 row → matched | partial | unsettled | unmapped | separate SQL 식."""
     owned_course_key = _sql_normalize_course_name(OwnedCourseOpening.course_name)
     settlement_key = and_(
+        SettlementConsolidated.company_id == company_id,
         _sql_strip_all_whitespace(SettlementConsolidated.client_name)
         == _sql_strip_all_whitespace(ClientNameMapping.client_name),
         _sql_normalize_course_name(SettlementConsolidated.course_name)
@@ -978,8 +1008,10 @@ def _compare_status_expr(separate_ids: Collection[int] | None = None):
     )
 
 
-def _compare_base_stmt(year: int, separate_ids: Collection[int] | None = None):
-    status_expr = _compare_status_expr(separate_ids)
+def _compare_base_stmt(
+    year: int, company_id: int, separate_ids: Collection[int] | None = None
+):
+    status_expr = _compare_status_expr(company_id, separate_ids)
     inst_trim = func.trim(OwnedCourseOpening.institution_name)
     return (
         select(
@@ -1002,6 +1034,7 @@ def _compare_base_stmt(year: int, separate_ids: Collection[int] | None = None):
         .where(
             OwnedCourseOpening.is_delete == False,  # noqa: E712
             OwnedCourseOpening.year == year,
+            OwnedCourseOpening.company_id == company_id,
         )
     )
 
@@ -1152,11 +1185,14 @@ async def _scroll_owned_courses(es, body: dict) -> list[dict[str, Any]]:
 )
 async def enqueue_owned_course_opening_refresh(
     year: int = Query(..., ge=2000, le=2100, description="추출할 훈련시작일 연도"),
+    company_id: int = Query(..., description="업체 ID"),
     min_score: float = Query(default=0, ge=0, description="보유과정 ES 매칭 min_score"),
     session: AsyncSession = Depends(get_async_session),
     user: User = Depends(current_active_user),
 ):
     """ES 추출은 scheduler_job_queue에서 비동기로 처리. queue 행을 즉시 반환한다."""
+    await require_active_company(session, company_id)
+
     in_flight_rows = (
         await session.execute(
             select(SchedulerJobQueue)
@@ -1171,7 +1207,10 @@ async def enqueue_owned_course_opening_refresh(
     ).scalars().all()
     for row in in_flight_rows:
         payload = dict(row.payload or {})
-        if int(payload.get("year") or 0) == year:
+        if (
+            int(payload.get("year") or 0) == year
+            and int(payload.get("company_id") or 0) == company_id
+        ):
             return _queue_to_extract_read(row)
 
     job_def = await session.get(SchedulerJob, OWNED_OPENING_EXTRACT_JOB_KEY)
@@ -1184,7 +1223,7 @@ async def enqueue_owned_course_opening_refresh(
                 cron_hour=3,
                 cron_minute=0,
                 timezone="Asia/Seoul",
-                description="ES에서 개설 보유과정을 추출해 캐시 테이블에 연도별 적재",
+                description="ES에서 개설 보유과정을 추출해 캐시 테이블에 연도·업체별 적재",
             )
         )
         await session.commit()
@@ -1198,13 +1237,19 @@ async def enqueue_owned_course_opening_refresh(
         action=QUEUE_ACTION_RUN_NOW,
         status=QUEUE_STATUS_PENDING,
         requested_by_user_id=user.id,
-        payload={"year": year, "min_score": min_score},
+        payload={"year": year, "company_id": company_id, "min_score": min_score},
     )
     session.add(q)
     await session.commit()
     await session.refresh(q)
 
-    q.payload = {**(q.payload or {}), "queue_id": q.id, "year": year, "min_score": min_score}
+    q.payload = {
+        **(q.payload or {}),
+        "queue_id": q.id,
+        "year": year,
+        "company_id": company_id,
+        "min_score": min_score,
+    }
     flag_modified(q, "payload")
     await session.commit()
     await session.refresh(q)
@@ -1231,12 +1276,13 @@ async def get_owned_course_opening_refresh_queue(
 
 
 async def _load_compare_summary(
-    session: AsyncSession, year: int
+    session: AsyncSession, year: int, company_id: int
 ) -> OwnedSettlementCompareResult:
     extracted_at = await session.scalar(
         select(func.max(OwnedCourseOpening.extracted_at)).where(
             OwnedCourseOpening.is_delete == False,  # noqa: E712
             OwnedCourseOpening.year == year,
+            OwnedCourseOpening.company_id == company_id,
         )
     )
     counts = (
@@ -1294,6 +1340,7 @@ async def _load_compare_summary(
             ).where(
                 OwnedSettlementCompareResultRow.is_delete == False,  # noqa: E712
                 OwnedSettlementCompareResultRow.year == year,
+                OwnedSettlementCompareResultRow.company_id == company_id,
             )
         )
     ).one()
@@ -1301,6 +1348,7 @@ async def _load_compare_summary(
     has_result = total > 0 or counts.compared_at is not None
     return OwnedSettlementCompareResult(
         year=year,
+        company_id=company_id,
         total=total,
         matched=int(counts.matched or 0),
         partial=int(counts.partial or 0),
@@ -1315,15 +1363,16 @@ async def _load_compare_summary(
 
 
 async def _persist_compare_results(
-    session: AsyncSession, year: int
+    session: AsyncSession, year: int, company_id: int
 ) -> OwnedSettlementCompareResult:
-    """자동 맵핑 + openings 분류 후 해당 연도 결과 hard delete & insert."""
+    """자동 맵핑 + openings 분류 후 해당 연도·업체 결과 hard delete & insert."""
     await _auto_register_identity_mappings(session, year)
 
     extracted_at = await session.scalar(
         select(func.max(OwnedCourseOpening.extracted_at)).where(
             OwnedCourseOpening.is_delete == False,  # noqa: E712
             OwnedCourseOpening.year == year,
+            OwnedCourseOpening.company_id == company_id,
         )
     )
     if extracted_at is None:
@@ -1332,11 +1381,11 @@ async def _persist_compare_results(
             detail="해당 연도 추출 캐시가 없습니다. 먼저 추출/갱신을 실행하세요.",
         )
 
-    separate_ids = await _collect_separate_opening_ids(session, year)
+    separate_ids = await _collect_separate_opening_ids(session, year, company_id)
 
     classified = (
         await session.execute(
-            _compare_base_stmt(year, separate_ids).order_by(
+            _compare_base_stmt(year, company_id, separate_ids).order_by(
                 OwnedCourseOpening.institution_name.asc().nulls_last(),
                 OwnedCourseOpening.course_name.asc().nulls_last(),
                 OwnedCourseOpening.tra_start_date.asc().nulls_last(),
@@ -1353,11 +1402,13 @@ async def _persist_compare_results(
     compared_at = datetime.now(timezone.utc)
     await session.execute(
         delete(OwnedSettlementCompareResultRow).where(
-            OwnedSettlementCompareResultRow.year == year
+            OwnedSettlementCompareResultRow.year == year,
+            OwnedSettlementCompareResultRow.company_id == company_id,
         )
     )
     to_insert = [
         OwnedSettlementCompareResultRow(
+            company_id=company_id,
             year=year,
             status=row.status,
             institution_name=row.institution_name,
@@ -1378,7 +1429,7 @@ async def _persist_compare_results(
         session.add_all(to_insert)
     await session.commit()
 
-    return await _load_compare_summary(session, year)
+    return await _load_compare_summary(session, year, company_id)
 
 
 def _transform_stored_compare_items(
@@ -1401,32 +1452,38 @@ def _transform_stored_compare_items(
 @router.get("/compare-owned", response_model=OwnedSettlementCompareResult)
 async def get_owned_settlement_compare(
     year: int = Query(..., ge=2000, le=2100, description="비교 연도"),
+    company_id: int = Query(..., description="업체 ID"),
     session: AsyncSession = Depends(get_async_session),
     _: User = Depends(current_active_user),
 ):
     """저장된 비교 결과 요약 조회 (재분류하지 않음)."""
-    return await _load_compare_summary(session, year)
+    await require_active_company(session, company_id)
+    return await _load_compare_summary(session, year, company_id)
 
 
 @router.post("/compare-owned", response_model=OwnedSettlementCompareResult)
 async def run_owned_settlement_compare(
     year: int = Query(..., ge=2000, le=2100, description="비교 연도"),
+    company_id: int = Query(..., description="업체 ID"),
     session: AsyncSession = Depends(get_async_session),
     _: User = Depends(current_active_user),
 ):
-    """비교 실행: 해당 연도 결과를 delete & insert로 갱신."""
-    return await _persist_compare_results(session, year)
+    """비교 실행: 해당 연도·업체 결과를 delete & insert로 갱신."""
+    await require_active_company(session, company_id)
+    return await _persist_compare_results(session, year, company_id)
 
 
 @router.get("/compare-owned/items", response_model=Page[OwnedSettlementCompareItem])
 async def list_owned_settlement_compare_items(
     year: int = Query(..., ge=2000, le=2100, description="비교 연도"),
+    company_id: int = Query(..., description="업체 ID"),
     status: CompareStatus = Query(..., description="탭 상태"),
     page: int = 1,
     size: int = 50,
     session: AsyncSession = Depends(get_async_session),
     _: User = Depends(current_active_user),
 ):
+    await require_active_company(session, company_id)
     if size < 1:
         raise HTTPException(status_code=400, detail="size must be >= 1")
     if size > MAX_PAGE_SIZE:
@@ -1438,6 +1495,7 @@ async def list_owned_settlement_compare_items(
         .where(
             OwnedSettlementCompareResultRow.is_delete == False,  # noqa: E712
             OwnedSettlementCompareResultRow.year == year,
+            OwnedSettlementCompareResultRow.company_id == company_id,
             OwnedSettlementCompareResultRow.status == status,
         )
         .order_by(
@@ -1488,11 +1546,13 @@ def _append_compare_rows(ws, rows: list[OwnedSettlementCompareResultRow]) -> Non
 @router.get("/compare-owned/export")
 async def export_owned_settlement_compare(
     year: int = Query(..., ge=2000, le=2100, description="비교 연도"),
+    company_id: int = Query(..., description="업체 ID"),
     session: AsyncSession = Depends(get_async_session),
     _: User = Depends(current_active_user),
 ):
     """저장된 비교 결과 테이블을 시트별 xlsx로 내보낸다."""
-    summary = await _load_compare_summary(session, year)
+    await require_active_company(session, company_id)
+    summary = await _load_compare_summary(session, year, company_id)
     if not summary.has_result:
         raise HTTPException(
             status_code=404,
@@ -1510,6 +1570,7 @@ async def export_owned_settlement_compare(
             .where(
                 OwnedSettlementCompareResultRow.is_delete == False,  # noqa: E712
                 OwnedSettlementCompareResultRow.year == year,
+                OwnedSettlementCompareResultRow.company_id == company_id,
             )
             .order_by(
                 OwnedSettlementCompareResultRow.institution_name.asc().nulls_last(),
@@ -1535,6 +1596,7 @@ async def export_owned_settlement_compare(
     ws_summary.title = "요약"
     ws_summary.append(["항목", "값"])
     ws_summary.append(["연도", year])
+    ws_summary.append(["업체ID", company_id])
     ws_summary.append(["전체", summary.total])
     ws_summary.append(["정산됨", summary.matched])
     ws_summary.append(["일부 정산", summary.partial])

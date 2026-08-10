@@ -1,16 +1,28 @@
 import { requireAccessToken } from "@/components/actions/auth-token";
 
-export async function GET() {
+export async function GET(request: Request) {
   const baseURL = process.env.API_BASE_URL;
   if (!baseURL) {
     return new Response("API_BASE_URL is not configured", { status: 500 });
   }
 
+  const { searchParams } = new URL(request.url);
+  const companyId = searchParams.get("company_id");
+  if (!companyId) {
+    return new Response("company_id is required", { status: 400 });
+  }
+
   const token = await requireAccessToken();
-  const res = await fetch(`${baseURL}/settlements/separate/export`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
+  const q = new URLSearchParams();
+  q.set("company_id", companyId);
+
+  const res = await fetch(
+    `${baseURL}/settlements/separate/export?${q.toString()}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    },
+  );
 
   if (!res.ok) {
     let message = `내보내기에 실패했습니다. (HTTP ${res.status})`;

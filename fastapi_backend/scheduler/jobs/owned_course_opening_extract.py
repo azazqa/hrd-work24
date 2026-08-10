@@ -44,6 +44,7 @@ def _aggregate_owned_opening_rows(
     owned_rows: list[dict[str, Any]],
     *,
     year: int,
+    company_id: int,
     extracted_at: datetime,
 ) -> list[OwnedCourseOpening]:
     """훈련기관명·과정명·훈련시작일·훈련종료일이 같으면 인원을 합산한다.
@@ -95,6 +96,7 @@ def _aggregate_owned_opening_rows(
     ) in groups.values():
         result.append(
             OwnedCourseOpening(
+                company_id=company_id,
                 year=year,
                 institution_name=institution_name,
                 course_name=course_name,
@@ -112,11 +114,17 @@ async def _run_extract(payload: dict[str, Any]) -> dict[str, Any]:
     if year is None:
         raise ValueError("payload.year is required")
     year = int(year)
+    company_id = payload.get("company_id")
+    if company_id is None:
+        raise ValueError("payload.company_id is required")
+    company_id = int(company_id)
     min_score = float(payload.get("min_score") or 0)
     queue_id = payload.get("queue_id")
 
     async with async_session_maker() as session:
-        names = await _load_active_owned_names(session)
+        names = await _load_active_owned_names(
+            session, usable_in_year=year, company_id=company_id
+        )
 
     owned_rows: list[dict[str, Any]] = []
     if names:
@@ -136,13 +144,16 @@ async def _run_extract(payload: dict[str, Any]) -> dict[str, Any]:
 
     extracted_at = datetime.now(timezone.utc)
     to_insert = _aggregate_owned_opening_rows(
-        owned_rows, year=year, extracted_at=extracted_at
+        owned_rows, year=year, company_id=company_id, extracted_at=extracted_at
     )
 
     async with async_session_maker() as session:
-        # 해당 연도 캐시를 전부 삭제 후 추출 결과로 교체한다.
+        # 해당 연도·업체 캐시를 완전 삭제 후 추출 결과로 교체한다.
         await session.execute(
-            delete(OwnedCourseOpening).where(OwnedCourseOpening.year == year)
+            delete(OwnedCourseOpening).where(
+                OwnedCourseOpening.year == year,
+                OwnedCourseOpening.company_id == company_id,
+            )
         )
 
         if to_insert:
@@ -153,6 +164,7 @@ async def _run_extract(payload: dict[str, Any]) -> dict[str, Any]:
             if q is not None and not q.is_delete:
                 pl = dict(q.payload or {})
                 pl["year"] = year
+                pl["company_id"] = company_id
                 pl["min_score"] = min_score
                 pl["row_count"] = len(to_insert)
                 pl["source_row_count"] = len(owned_rows)
@@ -163,14 +175,16 @@ async def _run_extract(payload: dict[str, Any]) -> dict[str, Any]:
         await session.commit()
 
     logger.info(
-        "[OWNED_OPENING_EXTRACT] year=%s source=%d stored=%d queue_id=%s",
+        "[OWNED_OPENING_EXTRACT] year=%s company_id=%s source=%d stored=%d queue_id=%s",
         year,
+        company_id,
         len(owned_rows),
         len(to_insert),
         queue_id,
     )
     return {
         "year": year,
+        "company_id": company_id,
         "row_count": len(to_insert),
         "source_row_count": len(owned_rows),
         "extracted_at": extracted_at.isoformat(),

@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { CompanySelect } from "@/components/company-select";
 import { Field, FieldLabel } from "@/components/ui/field";
 import {
   Select,
@@ -52,6 +53,7 @@ export function ExcelImportDialog() {
   const yearOptions = getTraYearOptions();
   const [open, setOpen] = useState(false);
   const [year, setYear] = useState(String(yearOptions[0] ?? new Date().getFullYear()));
+  const [companyId, setCompanyId] = useState("");
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<SettlementImportResult | null>(null);
 
@@ -59,6 +61,10 @@ export function ExcelImportDialog() {
     const file = fileRef.current?.files?.[0];
     if (!file) {
       toast.error("엑셀 파일을 선택하세요.");
+      return;
+    }
+    if (!companyId) {
+      toast.error("업체를 선택하세요.");
       return;
     }
     if (!year) {
@@ -70,6 +76,7 @@ export function ExcelImportDialog() {
     try {
       const formData = new FormData();
       formData.append("year", year);
+      formData.append("company_id", companyId);
       formData.append("file", file);
       const res = await fetch("/api/settlements/import", {
         method: "POST",
@@ -96,6 +103,7 @@ export function ExcelImportDialog() {
     setOpen(next);
     if (!next) {
       setResult(null);
+      setCompanyId("");
       if (fileRef.current) fileRef.current.value = "";
     } else {
       setYear(String(yearOptions[0] ?? new Date().getFullYear()));
@@ -113,9 +121,13 @@ export function ExcelImportDialog() {
         </DialogHeader>
         <div className="space-y-4 text-sm">
           <p className="text-muted-foreground">
-            매입년도를 선택한 뒤 해당 년도 엑셀을 업로드하세요. 선택한 년도의 기존
-            정산 데이터는 모두 삭제되고 엑셀 내용으로 교체됩니다.
+            업체·매입년도를 선택한 뒤 엑셀을 업로드하세요. 해당 업체·년도의 기존
+            정산 데이터는 삭제되고 엑셀 내용으로 교체됩니다.
           </p>
+          <Field>
+            <FieldLabel>업체</FieldLabel>
+            <CompanySelect value={companyId} onValueChange={setCompanyId} />
+          </Field>
           <Field>
             <FieldLabel htmlFor="settlement_year">매입년도</FieldLabel>
             <Select value={year} onValueChange={setYear}>

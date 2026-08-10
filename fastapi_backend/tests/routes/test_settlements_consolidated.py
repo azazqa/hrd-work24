@@ -11,10 +11,12 @@ from app.models import (
     SettlementConsolidated,
 )
 from app.routes.settlements import _refresh_settlements_consolidated
+from tests.conftest import create_company
 
 
 def _same_course_kwargs(**overrides):
     base = dict(
+        company_id=overrides.pop("company_id", None),
         purchase_ym="202405",
         purchase_year=2024,
         sales_ym="202404",
@@ -39,8 +41,9 @@ def _same_course_kwargs(**overrides):
 
 @pytest.mark.asyncio
 async def test_consolidated_mv_sums_identical_rows(db_session):
+    company = await create_company(db_session)
     for _ in range(10):
-        db_session.add(Settlement(**_same_course_kwargs()))
+        db_session.add(Settlement(**_same_course_kwargs(company_id=company.id)))
     await db_session.commit()
     await _refresh_settlements_consolidated(db_session)
 
@@ -64,9 +67,11 @@ async def test_consolidated_mv_sums_identical_rows(db_session):
 @pytest.mark.asyncio
 async def test_consolidated_mv_sums_when_amounts_differ_but_rates_same(db_session):
     """순매출·정산액만 달라도 요율 키가 같으면 SUM 한다."""
+    company = await create_company(db_session)
     db_session.add(
         Settlement(
             **_same_course_kwargs(
+                company_id=company.id,
                 net_sales=Decimal("700"),
                 settlement_amount=Decimal("350"),
             )
@@ -75,6 +80,7 @@ async def test_consolidated_mv_sums_when_amounts_differ_but_rates_same(db_sessio
     db_session.add(
         Settlement(
             **_same_course_kwargs(
+                company_id=company.id,
                 net_sales=Decimal("800"),
                 settlement_amount=Decimal("351"),
             )
@@ -100,8 +106,9 @@ async def test_consolidated_mv_sums_when_amounts_differ_but_rates_same(db_sessio
 @pytest.mark.asyncio
 async def test_consolidated_mv_keeps_note_diff_separate(db_session):
     """비고가 다르면 다른 과정으로 유지한다."""
-    db_session.add(Settlement(**_same_course_kwargs(note="비고A")))
-    db_session.add(Settlement(**_same_course_kwargs(note="비고B")))
+    company = await create_company(db_session)
+    db_session.add(Settlement(**_same_course_kwargs(company_id=company.id, note="비고A")))
+    db_session.add(Settlement(**_same_course_kwargs(company_id=company.id, note="비고B")))
     await db_session.commit()
     await _refresh_settlements_consolidated(db_session)
 
@@ -118,12 +125,15 @@ async def test_compare_uses_consolidated_mv(
     test_client, authenticated_user, db_session
 ):
     headers = authenticated_user["headers"]
+    company = await create_company(db_session)
+    cid = company.id
     extracted_at = datetime.now(timezone.utc)
     db_session.add(
         ClientNameMapping(institution_name="고객합산", client_name="고객합산")
     )
     db_session.add(
         OwnedCourseOpening(
+            company_id=cid,
             year=2024,
             institution_name="고객합산",
             course_name="분할과정",
@@ -133,12 +143,12 @@ async def test_compare_uses_consolidated_mv(
         )
     )
     for _ in range(10):
-        db_session.add(Settlement(**_same_course_kwargs()))
+        db_session.add(Settlement(**_same_course_kwargs(company_id=cid)))
     await db_session.commit()
     await _refresh_settlements_consolidated(db_session)
 
     res = await test_client.post(
-        "/settlements/compare-owned?year=2024",
+        f"/settlements/compare-owned?year=2024&company_id={cid}",
         headers=headers,
     )
     assert res.status_code == 200, res.text
@@ -152,12 +162,15 @@ async def test_compare_partial_when_headcount_differs(
     test_client, authenticated_user, db_session
 ):
     headers = authenticated_user["headers"]
+    company = await create_company(db_session)
+    cid = company.id
     extracted_at = datetime.now(timezone.utc)
     db_session.add(
         ClientNameMapping(institution_name="고객합산", client_name="고객합산")
     )
     db_session.add(
         OwnedCourseOpening(
+            company_id=cid,
             year=2024,
             institution_name="고객합산",
             course_name="분할과정",
@@ -167,12 +180,12 @@ async def test_compare_partial_when_headcount_differs(
         )
     )
     for _ in range(3):
-        db_session.add(Settlement(**_same_course_kwargs()))
+        db_session.add(Settlement(**_same_course_kwargs(company_id=cid)))
     await db_session.commit()
     await _refresh_settlements_consolidated(db_session)
 
     res = await test_client.post(
-        "/settlements/compare-owned?year=2024",
+        f"/settlements/compare-owned?year=2024&company_id={cid}",
         headers=headers,
     )
     assert res.status_code == 200, res.text
@@ -182,7 +195,7 @@ async def test_compare_partial_when_headcount_differs(
     assert body["unsettled"] == 0
 
     items = await test_client.get(
-        "/settlements/compare-owned/items?year=2024&status=partial&page=1&size=50",
+        f"/settlements/compare-owned/items?year=2024&company_id={cid}&status=partial&page=1&size=50",
         headers=headers,
     )
     assert items.status_code == 200
@@ -197,6 +210,8 @@ async def test_compare_matches_ignoring_spaces_in_course_and_client(
 ):
     """과정명·고객사명 내부 공백 차이만 있어도 정산 키로 매칭한다."""
     headers = authenticated_user["headers"]
+    company = await create_company(db_session)
+    cid = company.id
     extracted_at = datetime.now(timezone.utc)
     db_session.add(
         ClientNameMapping(
@@ -206,6 +221,7 @@ async def test_compare_matches_ignoring_spaces_in_course_and_client(
     )
     db_session.add(
         OwnedCourseOpening(
+            company_id=cid,
             year=2024,
             institution_name="(SE)에스이사이버평생교육원",
             course_name="간호사가 꼭 알아야 할 현장 실무",
@@ -217,6 +233,7 @@ async def test_compare_matches_ignoring_spaces_in_course_and_client(
     db_session.add(
         Settlement(
             **_same_course_kwargs(
+                company_id=cid,
                 purchase_ym="202406",
                 purchase_year=2024,
                 client_name="(주)에스이스페셜에듀",
@@ -231,7 +248,7 @@ async def test_compare_matches_ignoring_spaces_in_course_and_client(
     await _refresh_settlements_consolidated(db_session)
 
     res = await test_client.post(
-        "/settlements/compare-owned?year=2024",
+        f"/settlements/compare-owned?year=2024&company_id={cid}",
         headers=headers,
     )
     assert res.status_code == 200, res.text
@@ -295,12 +312,15 @@ async def test_compare_matches_normalized_course_name_tags(
 ):
     """선행[]·후행()·_접미·특수문자 정규화 후 과정명이 같으면 매칭한다."""
     headers = authenticated_user["headers"]
+    company = await create_company(db_session)
+    cid = company.id
     extracted_at = datetime.now(timezone.utc)
     db_session.add(
         ClientNameMapping(institution_name="정규화기관", client_name="정규화고객")
     )
     db_session.add(
         OwnedCourseOpening(
+            company_id=cid,
             year=2024,
             institution_name="정규화기관",
             course_name="간호사가 꼭 알아야 할 현장 실무",
@@ -312,6 +332,7 @@ async def test_compare_matches_normalized_course_name_tags(
     db_session.add(
         Settlement(
             **_same_course_kwargs(
+                company_id=cid,
                 purchase_ym="202406",
                 purchase_year=2024,
                 client_name="정규화고객",
@@ -326,7 +347,7 @@ async def test_compare_matches_normalized_course_name_tags(
     await _refresh_settlements_consolidated(db_session)
 
     res = await test_client.post(
-        "/settlements/compare-owned?year=2024",
+        f"/settlements/compare-owned?year=2024&company_id={cid}",
         headers=headers,
     )
     assert res.status_code == 200, res.text
@@ -341,11 +362,14 @@ async def test_export_settlements_consolidated_xlsx(
     test_client, authenticated_user, db_session
 ):
     headers = authenticated_user["headers"]
+    company = await create_company(db_session)
+    cid = company.id
     for _ in range(3):
-        db_session.add(Settlement(**_same_course_kwargs()))
+        db_session.add(Settlement(**_same_course_kwargs(company_id=cid)))
     db_session.add(
         Settlement(
             **_same_course_kwargs(
+                company_id=cid,
                 client_name="다른고객",
                 course_name="다른과정",
                 settlement_amount=Decimal("100"),
@@ -355,7 +379,10 @@ async def test_export_settlements_consolidated_xlsx(
     await db_session.commit()
     await _refresh_settlements_consolidated(db_session)
 
-    res = await test_client.get("/settlements/export", headers=headers)
+    res = await test_client.get(
+        f"/settlements/export?company_id={cid}",
+        headers=headers,
+    )
     assert res.status_code == 200, res.text
     assert "spreadsheetml" in (res.headers.get("content-type") or "")
 
