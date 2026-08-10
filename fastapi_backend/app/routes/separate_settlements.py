@@ -61,6 +61,7 @@ class SeparateSettlementListItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    company_id: int | None = None
     invoice_deadline_date: date | None
     invoice_deadline_year: int | None
     sales_rep: str | None

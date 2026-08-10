@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { companyLabel } from "@/lib/company-name-map";
 
 import { ExcelImportDialog } from "./excel-import-dialog";
 
@@ -29,15 +30,17 @@ export function OwnedCoursesListHeader() {
 
 type Props = {
   items: OwnedCourseListItem[];
+  companyNameById: Record<number, string>;
 };
 
-export function OwnedCoursesList({ items }: Props) {
+export function OwnedCoursesList({ items, companyNameById }: Props) {
   return (
     <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead className="w-20 text-center">ID</TableHead>
+            <TableHead className="w-36 text-center">업체</TableHead>
             <TableHead className="w-24 text-center">개발년도</TableHead>
             <TableHead className="w-28 text-center">구분</TableHead>
             <TableHead className="text-center">과정명</TableHead>
@@ -48,7 +51,7 @@ export function OwnedCoursesList({ items }: Props) {
         <TableBody>
           {items.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground">
+              <TableCell colSpan={7} className="text-center text-muted-foreground">
                 조회 결과가 없습니다.
               </TableCell>
             </TableRow>
@@ -56,6 +59,9 @@ export function OwnedCoursesList({ items }: Props) {
             items.map((row) => (
               <TableRow key={row.id}>
                 <TableCell className="text-center">{row.id}</TableCell>
+                <TableCell className="text-center">
+                  {companyLabel(row.company_id, companyNameById)}
+                </TableCell>
                 <TableCell className="text-center">{row.dev_year ?? "-"}</TableCell>
                 <TableCell className="text-center">{row.division ?? "-"}</TableCell>
                 <TableCell className="max-w-[360px]">{row.course_name}</TableCell>

@@ -1,4 +1,5 @@
 import type { SeparateSettlementListItem } from "@/components/actions/settlements-action";
+import { companyLabel } from "@/lib/company-name-map";
 import { formatNumberWithCommas } from "@/lib/format-utils";
 import {
   Table,
@@ -59,14 +60,16 @@ function formatRate(row: SeparateSettlementListItem): string {
 
 type Props = {
   items: SeparateSettlementListItem[];
+  companyNameById: Record<number, string>;
 };
 
-export function SeparateSettlementsList({ items }: Props) {
+export function SeparateSettlementsList({ items, companyNameById }: Props) {
   return (
     <div className="overflow-x-auto">
       <Table className="[&_td]:text-center">
         <TableHeader>
           <TableRow>
+            <TableHead>업체</TableHead>
             <TableHead>구분</TableHead>
             <TableHead>계산서(수취)마감일</TableHead>
             <TableHead>고객사</TableHead>
@@ -83,13 +86,16 @@ export function SeparateSettlementsList({ items }: Props) {
         <TableBody>
           {items.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={11} className="text-center text-muted-foreground">
+              <TableCell colSpan={12} className="text-center text-muted-foreground">
                 조회 결과가 없습니다.
               </TableCell>
             </TableRow>
           ) : (
             items.map((row) => (
               <TableRow key={row.id}>
+                <TableCell className="whitespace-nowrap">
+                  {companyLabel(row.company_id, companyNameById)}
+                </TableCell>
                 <TableCell>{row.category ?? "-"}</TableCell>
                 <TableCell className="whitespace-nowrap">
                   {row.invoice_deadline_date ?? "-"}

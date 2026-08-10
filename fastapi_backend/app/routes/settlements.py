@@ -497,6 +497,7 @@ class SettlementListItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    company_id: int | None = None
     purchase_ym: str
     purchase_year: int
     sales_ym: str | None

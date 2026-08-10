@@ -1,7 +1,6 @@
-import Link from "next/link";
-
 import { fetchOwnedCourses } from "@/components/actions/owned-courses-action";
 import { PagePagination } from "@/components/page-pagination";
+import { loadCompanyNameById } from "@/lib/company-name-map";
 
 import { OwnedCoursesList, OwnedCoursesListHeader } from "./owned-courses-list";
 import { OwnedCoursesSearchForm } from "./owned-courses-search-form";
@@ -54,6 +53,7 @@ export default async function OwnedCoursesPage({ searchParams }: OwnedCoursesPag
     dev_year: dev_year != null && Number.isFinite(dev_year) ? dev_year : undefined,
     division: params.division,
   });
+  const companyNameById = await loadCompanyNameById();
 
   const totalItems = "message" in data ? 0 : (data.total ?? 0);
   const totalPages =
@@ -88,7 +88,10 @@ export default async function OwnedCoursesPage({ searchParams }: OwnedCoursesPag
         {"message" in data ? (
           <p className="text-sm text-destructive">{data.message}</p>
         ) : (
-          <OwnedCoursesList items={data.items ?? []} />
+          <OwnedCoursesList
+            items={data.items ?? []}
+            companyNameById={companyNameById}
+          />
         )}
 
         <PagePagination

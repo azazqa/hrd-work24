@@ -4,6 +4,7 @@ import { requireAccessToken } from "@/components/actions/auth-token";
 
 export type SettlementListItem = {
   id: number;
+  company_id: number | null;
   purchase_ym: string;
   purchase_year: number;
   sales_ym: string | null;
@@ -35,6 +36,7 @@ export type SettlementListSearch = {
 
 export type SeparateSettlementListItem = {
   id: number;
+  company_id: number | null;
   invoice_deadline_date: string | null;
   invoice_deadline_year: number | null;
   sales_rep: string | null;

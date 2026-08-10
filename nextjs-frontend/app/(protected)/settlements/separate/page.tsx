@@ -1,5 +1,6 @@
 import { fetchSeparateSettlements } from "@/components/actions/settlements-action";
 import { PagePagination } from "@/components/page-pagination";
+import { loadCompanyNameById } from "@/lib/company-name-map";
 
 import {
   SeparateSettlementsList,
@@ -56,6 +57,7 @@ export default async function SeparateSettlementsPage({
     client_name: params.client_name,
     course_name: params.course_name,
   });
+  const companyNameById = await loadCompanyNameById();
 
   const totalItems = "message" in data ? 0 : (data.total ?? 0);
   const totalPages =
@@ -92,7 +94,10 @@ export default async function SeparateSettlementsPage({
         {"message" in data ? (
           <p className="text-sm text-destructive">{data.message}</p>
         ) : (
-          <SeparateSettlementsList items={data.items ?? []} />
+          <SeparateSettlementsList
+            items={data.items ?? []}
+            companyNameById={companyNameById}
+          />
         )}
 
         <PagePagination

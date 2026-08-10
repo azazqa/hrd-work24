@@ -1,5 +1,6 @@
 import { fetchSettlements } from "@/components/actions/settlements-action";
 import { PagePagination } from "@/components/page-pagination";
+import { loadCompanyNameById } from "@/lib/company-name-map";
 
 import { SettlementsList, SettlementsListHeader } from "./settlements-list";
 import { SettlementsSearchForm } from "./settlements-search-form";
@@ -49,6 +50,7 @@ export default async function SettlementsPage({ searchParams }: SettlementsPageP
     client_name: params.client_name,
     course_name: params.course_name,
   });
+  const companyNameById = await loadCompanyNameById();
 
   const totalItems = "message" in data ? 0 : (data.total ?? 0);
   const totalPages =
@@ -82,7 +84,10 @@ export default async function SettlementsPage({ searchParams }: SettlementsPageP
         {"message" in data ? (
           <p className="text-sm text-destructive">{data.message}</p>
         ) : (
-          <SettlementsList items={data.items ?? []} />
+          <SettlementsList
+            items={data.items ?? []}
+            companyNameById={companyNameById}
+          />
         )}
 
         <PagePagination

@@ -1,4 +1,5 @@
 import type { SettlementListItem } from "@/components/actions/settlements-action";
+import { companyLabel } from "@/lib/company-name-map";
 import { formatNumberWithCommas } from "@/lib/format-utils";
 import {
   Table,
@@ -61,14 +62,16 @@ function formatAmount(value: string | number | null | undefined): string {
 
 type Props = {
   items: SettlementListItem[];
+  companyNameById: Record<number, string>;
 };
 
-export function SettlementsList({ items }: Props) {
+export function SettlementsList({ items, companyNameById }: Props) {
   return (
     <div className="overflow-x-auto">
       <Table className="[&_td]:text-center">
         <TableHeader>
           <TableRow>
+            <TableHead>업체</TableHead>
             <TableHead>매입년월</TableHead>
             <TableHead>매출년월</TableHead>
             <TableHead>고객사</TableHead>
@@ -84,13 +87,16 @@ export function SettlementsList({ items }: Props) {
         <TableBody>
           {items.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={10} className="text-center text-muted-foreground">
+              <TableCell colSpan={11} className="text-center text-muted-foreground">
                 조회 결과가 없습니다.
               </TableCell>
             </TableRow>
           ) : (
             items.map((row) => (
               <TableRow key={row.id}>
+                <TableCell className="whitespace-nowrap">
+                  {companyLabel(row.company_id, companyNameById)}
+                </TableCell>
                 <TableCell className="whitespace-nowrap">{row.purchase_ym}</TableCell>
                 <TableCell className="whitespace-nowrap">{row.sales_ym ?? "-"}</TableCell>
                 <TableCell className="max-w-[140px]">{row.client_name}</TableCell>
