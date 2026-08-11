@@ -178,10 +178,14 @@ async def _find_existing_for_import(
     company_id: int,
     course_name: str,
     dev_year: int | None,
-) -> OwnedCourse | str:
-    """업체+과정명(+개발년도)으로 기존 행을 찾는다. 'ambiguous'면 동명이 2건 이상."""
+) -> OwnedCourse | str | None:
+    """동일 업체·과정명·개발년도의 기존 행을 찾는다. 'ambiguous'면 동명이 2건 이상.
+
+    다른 업체 또는 company_id 미지정(NULL) 행은 절대 매칭하지 않는다.
+    """
     stmt = select(OwnedCourse).where(
         OwnedCourse.is_delete == False,  # noqa: E712
+        OwnedCourse.company_id.is_not(None),
         OwnedCourse.company_id == company_id,
         OwnedCourse.course_name == course_name,
     )
@@ -192,7 +196,13 @@ async def _find_existing_for_import(
     rows = list((await session.scalars(stmt)).all())
     if len(rows) > 1:
         return "ambiguous"
-    return rows[0] if rows else None
+    if not rows:
+        return None
+    row = rows[0]
+    # 방어: 업체 스코프가 깨진 결과면 수정하지 않고 신규 등록으로 넘긴다.
+    if row.company_id != company_id:
+        return None
+    return row
 
 
 @router.get("", response_model=Page[OwnedCourseListItem])
@@ -327,7 +337,10 @@ async def import_owned_courses(
                 )
                 continue
             if existing is not None:
+                # company_id는 upsert 키이므로 덮어쓰지 않는다(다른 업체 행 보호).
                 for k, v in fields.items():
+                    if k == "company_id":
+                        continue
                     setattr(existing, k, v)
                 updated += 1
             else:

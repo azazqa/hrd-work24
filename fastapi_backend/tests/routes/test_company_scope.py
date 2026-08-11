@@ -128,6 +128,7 @@ async def test_owned_course_import_upsert_scoped_by_company(
     )
     assert res_b.status_code == 200, res_b.text
     assert res_b.json()["created"] == 1
+    assert res_b.json()["updated"] == 0
 
     total = await db_session.scalar(
         select(func.count())
@@ -138,6 +139,49 @@ async def test_owned_course_import_upsert_scoped_by_company(
         )
     )
     assert total == 2
+
+    a_row = await db_session.scalar(
+        select(OwnedCourse).where(
+            OwnedCourse.company_id == company_a.id,
+            OwnedCourse.course_name == "동일과정",
+            OwnedCourse.is_delete == False,  # noqa: E712
+        )
+    )
+    b_row = await db_session.scalar(
+        select(OwnedCourse).where(
+            OwnedCourse.company_id == company_b.id,
+            OwnedCourse.course_name == "동일과정",
+            OwnedCourse.is_delete == False,  # noqa: E712
+        )
+    )
+    assert a_row is not None and b_row is not None
+    assert a_row.id != b_row.id
+    assert a_row.division == "구분1"
+
+    # B에 다른 구분으로 재업로드 → A는 그대로, B만 수정
+    content_b2 = _owned_xlsx([[2024, "동일과정", "구분B수정"]])
+    again_b = await test_client.post(
+        "/owned-courses/import",
+        headers=headers,
+        files={
+            "file": (
+                "b2.xlsx",
+                content_b2,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+        data={"company_id": str(company_b.id)},
+    )
+    assert again_b.status_code == 200
+    assert again_b.json()["updated"] == 1
+    assert again_b.json()["created"] == 0
+
+    await db_session.refresh(a_row)
+    await db_session.refresh(b_row)
+    assert a_row.division == "구분1"
+    assert a_row.company_id == company_a.id
+    assert b_row.division == "구분B수정"
+    assert b_row.company_id == company_b.id
 
     again_a = await test_client.post(
         "/owned-courses/import",
@@ -154,6 +198,57 @@ async def test_owned_course_import_upsert_scoped_by_company(
     assert again_a.status_code == 200
     assert again_a.json()["updated"] == 1
     assert again_a.json()["created"] == 0
+
+
+@pytest.mark.asyncio
+async def test_owned_course_import_does_not_update_null_company_rows(
+    test_client, authenticated_user, db_session
+):
+    """company_id NULL 레거시 행은 다른 업체 업로드 시 수정되지 않고 신규 등록한다."""
+    headers = authenticated_user["headers"]
+    company = await create_company(db_session, "신규업체")
+    legacy = OwnedCourse(
+        company_id=None,
+        course_name="레거시과정",
+        dev_year=2024,
+        division="옛구분",
+        is_active=True,
+    )
+    db_session.add(legacy)
+    await db_session.commit()
+    legacy_id = legacy.id
+
+    content = _owned_xlsx([[2024, "레거시과정", "신규구분"]])
+    res = await test_client.post(
+        "/owned-courses/import",
+        headers=headers,
+        files={
+            "file": (
+                "n.xlsx",
+                content,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+        data={"company_id": str(company.id)},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["created"] == 1
+    assert res.json()["updated"] == 0
+
+    await db_session.refresh(legacy)
+    assert legacy.id == legacy_id
+    assert legacy.company_id is None
+    assert legacy.division == "옛구분"
+
+    new_row = await db_session.scalar(
+        select(OwnedCourse).where(
+            OwnedCourse.company_id == company.id,
+            OwnedCourse.course_name == "레거시과정",
+        )
+    )
+    assert new_row is not None
+    assert new_row.id != legacy_id
+    assert new_row.division == "신규구분"
 
 
 @pytest.mark.asyncio
