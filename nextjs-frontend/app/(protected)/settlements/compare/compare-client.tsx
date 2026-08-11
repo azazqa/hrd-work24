@@ -343,18 +343,20 @@ export function CompareOwnedClient({
         </div>
         <div className="space-y-2">
           <Label htmlFor="year">비교 연도</Label>
-          <Select value={yearInput} onValueChange={onYearChange}>
-            <SelectTrigger id="year" className="w-40">
-              <SelectValue placeholder="연도 선택" />
-            </SelectTrigger>
-            <SelectContent>
-              {yearOptions.map((y) => (
-                <SelectItem key={y} value={String(y)}>
-                  {y}년
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="w-48">
+            <Select value={yearInput} onValueChange={onYearChange}>
+              <SelectTrigger id="year">
+                <SelectValue placeholder="연도 선택" />
+              </SelectTrigger>
+              <SelectContent>
+                {yearOptions.map((y) => (
+                  <SelectItem key={y} value={String(y)}>
+                    {y}년
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <Button type="submit" disabled={comparing}>
           {comparing ? "비교 중…" : "비교"}
